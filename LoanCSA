@@ -1,0 +1,1447 @@
+<!DOCTYPE html>
+<html lang="en-ZA">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard | Loan Connect</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #007749; /* SA Blue */
+            --secondary: #6c757d;
+            --success: #28a745;
+            --warning: #FFB81C; /* SA Yellow */
+            --danger: #E03C31; /* SA Red */
+            --light: #f8f9fa;
+            --dark: #212529;
+            --admin: #6f42c1;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f7fa;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            background-color: white;
+            height: 100vh;
+            position: fixed;
+            box-shadow: 0 0 15px rgba(0,0,0,0.1);
+            width: 280px;
+        }
+
+        .sidebar-brand {
+            padding: 1.5rem;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+
+        .sidebar-nav {
+            padding: 1rem 0;
+        }
+
+        .nav-link {
+            color: #495057;
+            padding: 0.75rem 1.5rem;
+            border-left: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .nav-link:hover, .nav-link.active {
+            color: var(--admin);
+            background-color: rgba(111,66,193,0.05);
+            border-left: 3px solid var(--admin);
+        }
+
+        .nav-link i {
+            width: 24px;
+            text-align: center;
+            margin-right: 10px;
+        }
+
+        .admin-badge {
+            background-color: var(--admin);
+            color: white;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: 280px;
+            padding: 2rem;
+        }
+
+        /* Dashboard Cards */
+        .dashboard-card {
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+            transition: all 0.3s;
+        }
+
+        .dashboard-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+
+        .card-value {
+            font-size: 2rem;
+            font-weight: 700;
+        }
+
+        /* Tables */
+        .data-table {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+            overflow: hidden;
+        }
+
+        /* Wallet Styles */
+        .wallet-balance {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--admin);
+        }
+
+        /* Responsive */
+        @media (max-width: 992px) {
+            .sidebar {
+                width: 250px;
+            }
+            .main-content {
+                margin-left: 250px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+            }
+            .main-content {
+                margin-left: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-brand">
+            <h4 class="mb-0">
+                <i class="fas fa-shield-alt text-admin me-2"></i>
+                <span style="color: var(--admin)">Loan</span> Connect
+            </h4>
+            <small class="text-muted">Admin Dashboard</small>
+        </div>
+        <div class="sidebar-nav">
+            <ul class="nav flex-column">
+                <li class="nav-item">
+                    <a class="nav-link active" href="#">
+                        <i class="fas fa-tachometer-alt"></i>
+                        Dashboard
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#enquiries">
+                        <i class="fas fa-users"></i>
+                        Enquiries
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#lenders">
+                        <i class="fas fa-building"></i>
+                        Lenders
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#wallet">
+                        <i class="fas fa-wallet"></i>
+                        Wallet
+                        <span class="badge admin-badge float-end">R<span id="walletBalance">0.00</span></span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#transactions">
+                        <i class="fas fa-exchange-alt"></i>
+                        Transactions
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#settings">
+                        <i class="fas fa-cog"></i>
+                        Settings
+                    </a>
+                </li>
+                <li class="nav-item mt-4">
+                    <a class="nav-link text-danger" href="#">
+                        <i class="fas fa-sign-out-alt"></i>
+                        Logout
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="container-fluid">
+            <!-- Dashboard Section (Default) -->
+            <div id="dashboard-section" class="content-section">
+                <!-- Dashboard Header -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2 class="mb-0">Admin Dashboard</h2>
+                    <div class="d-flex">
+                        <div class="input-group me-3" style="width: 250px;">
+                            <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
+                            <input type="text" class="form-control" placeholder="Search...">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stats Cards -->
+                <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="dashboard-card card p-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Total Enquiries</h6>
+                                <h3 class="card-value mb-0" id="totalEnquiries">0</h3>
+                            </div>
+                            <div class="bg-primary bg-opacity-10 p-3 rounded">
+                                <i class="fas fa-users text-primary fs-4"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="dashboard-card card p-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Active Lenders</h6>
+                                <h3 class="card-value mb-0" id="activeLenders">0</h3>
+                            </div>
+                            <div class="bg-success bg-opacity-10 p-3 rounded">
+                                <i class="fas fa-building text-success fs-4"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="dashboard-card card p-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Today's Revenue</h6>
+                                <h3 class="card-value mb-0" id="todaysRevenue">R0.00</h3>
+                            </div>
+                            <div class="bg-warning bg-opacity-10 p-3 rounded">
+                                <i class="fas fa-rand-sign text-warning fs-4"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="dashboard-card card p-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">System Balance</h6>
+                                <h3 class="card-value mb-0" id="systemBalance">R0.00</h3>
+                            </div>
+                            <div class="bg-admin bg-opacity-10 p-3 rounded">
+                                <i class="fas fa-wallet" style="color: var(--admin);" class="fs-4"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Transactions -->
+            <div class="card data-table mb-4">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Recent Transactions</h5>
+                    <a href="#transactions" class="btn btn-sm btn-outline-primary">View All</a>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Lender</th>
+                                    <th>Amount</th>
+                                    <th>Type</th>
+                                    <th>Enquiry</th>
+                                    <th>Date</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recentTransactions">
+                                <!-- Filled by JavaScript -->
+                                <tr>
+                                    <td colspan="7" class="text-center py-4">Loading transactions...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pending Lender Verifications -->
+            <div class="card data-table">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Pending Lender Verifications</h5>
+                    <a href="#lenders" class="btn btn-sm btn-outline-primary">View All</a>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Lender</th>
+                                    <th>Contact</th>
+                                    <th>Submitted</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pendingLenders">
+                                <!-- Filled by JavaScript -->
+                                <tr>
+                                    <td colspan="5" class="text-center py-4">Loading pending lenders...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            </div>
+            <!-- End Dashboard Section -->
+
+            <!-- Enquiries Section -->
+            <div id="enquiries-section" class="content-section" style="display: none;">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2 class="mb-0">All Enquiries</h2>
+                    <div class="d-flex">
+                        <div class="input-group me-3" style="width: 250px;">
+                            <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
+                            <input type="text" class="form-control" id="enquirySearch" placeholder="Search enquiries...">
+                        </div>
+                        <button class="btn btn-primary" onclick="loadEnquiries()">
+                            <i class="fas fa-sync-alt me-2"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card data-table">
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Borrower</th>
+                                        <th>Amount</th>
+                                        <th>Lender</th>
+                                        <th>Status</th>
+                                        <th>Date</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="enquiriesTable">
+                                    <tr>
+                                        <td colspan="7" class="text-center py-4">Loading enquiries...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- End Enquiries Section -->
+
+            <!-- Lenders Section -->
+            <div id="lenders-section" class="content-section" style="display: none;">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2 class="mb-0">Lenders Management</h2>
+                    <div class="d-flex">
+                        <button class="btn btn-outline-primary me-2" onclick="filterLenders('all')">
+                            <i class="fas fa-list me-2"></i> All
+                        </button>
+                        <button class="btn btn-outline-warning me-2" onclick="filterLenders('pending')">
+                            <i class="fas fa-clock me-2"></i> Pending
+                        </button>
+                        <button class="btn btn-outline-success me-2" onclick="filterLenders('approved')">
+                            <i class="fas fa-check me-2"></i> Approved
+                        </button>
+                        <button class="btn btn-primary" onclick="loadLenders()">
+                            <i class="fas fa-sync-alt me-2"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card data-table">
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Company Name</th>
+                                        <th>Contact</th>
+                                        <th>Email</th>
+                                        <th>Status</th>
+                                        <th>Registered</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="lendersTable">
+                                    <tr>
+                                        <td colspan="7" class="text-center py-4">Loading lenders...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- End Lenders Section -->
+
+            <!-- Wallet Section -->
+            <div id="wallet-section" class="content-section" style="display: none;">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2 class="mb-0">Wallet Management</h2>
+                    <button class="btn btn-primary" onclick="loadWalletData()">
+                        <i class="fas fa-sync-alt me-2"></i> Refresh
+                    </button>
+                </div>
+
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <div class="dashboard-card card p-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">System Balance</h6>
+                                    <h3 class="card-value mb-0" id="walletSystemBalance">R0.00</h3>
+                                </div>
+                                <div class="bg-admin bg-opacity-10 p-3 rounded">
+                                    <i class="fas fa-wallet" style="color: var(--admin);" class="fs-4"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="dashboard-card card p-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Pending Payouts</h6>
+                                    <h3 class="card-value text-warning mb-0" id="pendingPayouts">R0.00</h3>
+                                </div>
+                                <div class="bg-warning bg-opacity-10 p-3 rounded">
+                                    <i class="fas fa-clock text-warning fs-4"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="dashboard-card card p-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Total Processed</h6>
+                                    <h3 class="card-value text-success mb-0" id="totalProcessed">R0.00</h3>
+                                </div>
+                                <div class="bg-success bg-opacity-10 p-3 rounded">
+                                    <i class="fas fa-check-circle text-success fs-4"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card data-table">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">Wallet Transactions</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Type</th>
+                                        <th>Description</th>
+                                        <th>Amount</th>
+                                        <th>Balance</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="walletTransactionsTable">
+                                    <tr>
+                                        <td colspan="6" class="text-center py-4">Loading wallet transactions...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- End Wallet Section -->
+
+            <!-- Transactions Section -->
+            <div id="transactions-section" class="content-section" style="display: none;">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2 class="mb-0">All Transactions</h2>
+                    <div class="d-flex">
+                        <select class="form-select me-2" id="transactionTypeFilter" style="width: 150px;">
+                            <option value="">All Types</option>
+                            <option value="enquiry">Enquiry Fee</option>
+                            <option value="payout">Payout</option>
+                            <option value="refund">Refund</option>
+                        </select>
+                        <button class="btn btn-primary" onclick="loadTransactions()">
+                            <i class="fas fa-sync-alt me-2"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card data-table">
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Lender</th>
+                                        <th>Amount</th>
+                                        <th>Type</th>
+                                        <th>Enquiry</th>
+                                        <th>Date</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="transactionsTable">
+                                    <tr>
+                                        <td colspan="7" class="text-center py-4">Loading transactions...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- End Transactions Section -->
+
+            <!-- Settings Section -->
+            <div id="settings-section" class="content-section" style="display: none;">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2 class="mb-0">Admin Settings</h2>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card mb-4">
+                            <div class="card-header bg-white">
+                                <h5 class="mb-0">System Settings</h5>
+                            </div>
+                            <div class="card-body">
+                                <form id="systemSettingsForm">
+                                    <div class="mb-3">
+                                        <label class="form-label">Enquiry Fee (ZAR)</label>
+                                        <input type="number" class="form-control" id="enquiryFee" value="110.00" step="0.01" min="0">
+                                        <small class="text-muted">Fee charged per enquiry sent to lenders</small>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Platform Commission (%)</label>
+                                        <input type="number" class="form-control" id="platformCommission" value="2.5" step="0.1" min="0" max="100">
+                                        <small class="text-muted">Commission on approved loans</small>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Auto-Approval Threshold (ZAR)</label>
+                                        <input type="number" class="form-control" id="autoApprovalThreshold" value="5000.00" step="100" min="0">
+                                        <small class="text-muted">Maximum amount for automatic approval</small>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-2"></i> Save System Settings
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card mb-4">
+                            <div class="card-header bg-white">
+                                <h5 class="mb-0">Admin Profile</h5>
+                            </div>
+                            <div class="card-body">
+                                <form id="adminProfileForm">
+                                    <div class="mb-3">
+                                        <label class="form-label">Name</label>
+                                        <input type="text" class="form-control" id="adminName" value="Admin User">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Email</label>
+                                        <input type="email" class="form-control" id="adminEmail" value="admin@loanconnect.co.za">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Role</label>
+                                        <input type="text" class="form-control" id="adminRole" value="System Administrator" readonly>
+                                        <small class="text-muted">Role cannot be changed</small>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-2"></i> Update Profile
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="alert alert-success" id="settingsSaveSuccess" style="display: none;">
+                    <i class="fas fa-check-circle me-2"></i>
+                    <strong>Success!</strong> Settings have been saved successfully.
+                </div>
+            </div>
+            <!-- End Settings Section -->
+        </div>
+    </div>
+
+    <!-- Payment Modal -->
+    <div class="modal fade" id="paymentModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Process Payment</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Amount (ZAR)</label>
+                        <input type="number" class="form-control" id="paymentAmount" placeholder="0.00">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Payment Method</label>
+                        <select class="form-select" id="paymentMethod">
+                            <option value="wallet">Wallet Balance</option>
+                            <option value="card">Credit/Debit Card</option>
+                            <option value="bank">Bank Transfer</option>
+                        </select>
+                    </div>
+                    <div id="cardDetails" class="d-none">
+                        <div class="mb-3">
+                            <label class="form-label">Card Number</label>
+                            <input type="text" class="form-control" placeholder="1234 5678 9012 3456">
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Expiry Date</label>
+                                <input type="text" class="form-control" placeholder="MM/YY">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">CVV</label>
+                                <input type="text" class="form-control" placeholder="123">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="confirmPayment">Confirm Payment</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Payment Gateway SDK (example using Paystack) -->
+    <script src="https://js.paystack.co/v1/inline.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Setup navigation
+            setupNavigation();
+            
+            // Load admin dashboard data
+            fetchAdminData();
+            
+            // Payment method toggle
+            document.getElementById('paymentMethod').addEventListener('change', function() {
+                const cardDetails = document.getElementById('cardDetails');
+                if (this.value === 'card') {
+                    cardDetails.classList.remove('d-none');
+                } else {
+                    cardDetails.classList.add('d-none');
+                }
+            });
+            
+            // Handle payment confirmation
+            document.getElementById('confirmPayment').addEventListener('click', processPayment);
+        });
+        
+        function setupNavigation() {
+            // Get all navigation links
+            const navLinks = document.querySelectorAll('.sidebar .nav-link');
+            
+            navLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    const href = this.getAttribute('href');
+                    
+                    // Handle logout
+                    if (this.textContent.trim().includes('Logout')) {
+                        e.preventDefault();
+                        if (confirm('Are you sure you want to logout?')) {
+                            localStorage.removeItem('authToken');
+                            window.location.href = '/login.html';
+                        }
+                        return;
+                    }
+                    
+                    // Handle hash navigation
+                    if (href && href.startsWith('#') && href !== '#') {
+                        e.preventDefault();
+                        
+                        // Update active state
+                        navLinks.forEach(l => l.classList.remove('active'));
+                        this.classList.add('active');
+                        
+                        // Show appropriate section
+                        const section = href.substring(1);
+                        showSection(section);
+                    }
+                });
+            });
+            
+            // Handle browser back/forward buttons
+            window.addEventListener('hashchange', function() {
+                const hash = window.location.hash.substring(1) || 'dashboard';
+                showSection(hash);
+            });
+        }
+        
+        function showSection(section) {
+            // Hide all content sections
+            document.querySelectorAll('.content-section').forEach(sec => {
+                sec.style.display = 'none';
+            });
+            
+            // Show the selected section
+            const sectionId = section === 'dashboard' ? 'dashboard-section' : `${section}-section`;
+            const targetSection = document.getElementById(sectionId);
+            
+            if (targetSection) {
+                targetSection.style.display = 'block';
+                
+                // Load data for the selected section
+                switch(section) {
+                    case 'dashboard':
+                        fetchAdminData();
+                        break;
+                    case 'enquiries':
+                        loadEnquiries();
+                        break;
+                    case 'lenders':
+                        loadLenders();
+                        break;
+                    case 'wallet':
+                        loadWalletData();
+                        break;
+                    case 'transactions':
+                        loadTransactions();
+                        break;
+                    case 'settings':
+                        // Settings page is static for now
+                        break;
+                }
+            }
+        }
+        
+        async function fetchAdminData() {
+            try {
+                // Show loading states
+                document.getElementById('totalEnquiries').textContent = '...';
+                document.getElementById('activeLenders').textContent = '...';
+                document.getElementById('todaysRevenue').textContent = 'R...';
+                document.getElementById('systemBalance').textContent = 'R...';
+                document.getElementById('walletBalance').textContent = '...';
+                
+                // Get auth token from localStorage
+                const token = localStorage.getItem('authToken');
+                if (!token) {
+                    console.log('Not authenticated. Using demo data.');
+                    // Use demo data instead of throwing error
+                    loadDemoData();
+                    return;
+                }
+                
+                // Fetch admin stats
+                const statsResponse = await fetch('/api/admin/stats', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (!statsResponse.ok) {
+                    console.log('Failed to fetch admin stats. Using demo data.');
+                    loadDemoData();
+                    return;
+                }
+                
+                const stats = await statsResponse.json();
+                
+                // Update dashboard stats
+                document.getElementById('totalEnquiries').textContent = stats.totalApplications.toLocaleString();
+                document.getElementById('activeLenders').textContent = stats.activeLenders.toLocaleString();
+                document.getElementById('todaysRevenue').textContent = 'R' + stats.todaysRevenue.toFixed(2);
+                document.getElementById('systemBalance').textContent = 'R' + stats.systemBalance.toFixed(2);
+                document.getElementById('walletBalance').textContent = stats.systemBalance.toFixed(2);
+                
+                // Fetch recent transactions
+                const transactionsResponse = await fetch('/api/admin/transactions', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (transactionsResponse.ok) {
+                    const transactions = await transactionsResponse.json();
+                    const tbody = document.getElementById('recentTransactions');
+                    tbody.innerHTML = transactions.map(txn => `
+                        <tr>
+                            <td>${txn.id}</td>
+                            <td>${txn.lender}</td>
+                            <td class="fw-bold">R${txn.amount.toFixed(2)}</td>
+                            <td>${txn.type}</td>
+                            <td>${txn.enquiry}</td>
+                            <td>${txn.date}</td>
+                            <td><span class="badge bg-success">${txn.status}</span></td>
+                        </tr>
+                    `).join('');
+                }
+                
+                // Fetch pending lenders
+                const pendingResponse = await fetch('/api/admin/lenders/pending', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (pendingResponse.ok) {
+                    const pendingLenders = await pendingResponse.json();
+                    const lenderTbody = document.getElementById('pendingLenders');
+                    
+                    if (pendingLenders.length === 0) {
+                        lenderTbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No pending lenders</td></tr>';
+                    } else {
+                        lenderTbody.innerHTML = pendingLenders.map(lender => `
+                            <tr data-lender-id="${lender._id}">
+                                <td>${lender._id.substring(18)}</td>
+                                <td>${lender.companyName}</td>
+                                <td>${lender.email}</td>
+                                <td>${formatDate(lender.createdAt)}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-success me-1 approve-btn" data-lender-id="${lender._id}">Approve</button>
+                                    <button class="btn btn-sm btn-danger reject-btn" data-lender-id="${lender._id}">Reject</button>
+                                </td>
+                            </tr>
+                        `).join('');
+                        
+                        // Add event listeners to buttons
+                        document.querySelectorAll('.approve-btn').forEach(btn => {
+                            btn.addEventListener('click', approveLender);
+                        });
+                        
+                        document.querySelectorAll('.reject-btn').forEach(btn => {
+                            btn.addEventListener('click', rejectLender);
+                        });
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Error loading dashboard data:', error);
+                loadDemoData();
+            }
+        }
+        
+        function loadDemoData() {
+            // Load demo data when API is not available
+            document.getElementById('totalEnquiries').textContent = '125';
+            document.getElementById('activeLenders').textContent = '15';
+            document.getElementById('todaysRevenue').textContent = 'R12,500.00';
+            document.getElementById('systemBalance').textContent = 'R45,000.00';
+            document.getElementById('walletBalance').textContent = '45,000.00';
+            
+            const tbody = document.getElementById('recentTransactions');
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Demo mode - Connect to API for real data</td></tr>';
+            
+            const lenderTbody = document.getElementById('pendingLenders');
+            lenderTbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Demo mode - Connect to API for real data</td></tr>';
+        }
+        
+        function formatDate(dateString) {
+            if (!dateString) return 'N/A';
+            const date = new Date(dateString);
+            const now = new Date();
+            const diff = now - date;
+            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+            
+            if (hours < 1) return 'Just now';
+            if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+            if (days === 1) return 'Yesterday';
+            if (days < 7) return `${days} days ago`;
+            
+            return date.toLocaleDateString();
+        }
+        
+        async function approveLender(e) {
+            const lenderId = e.target.dataset.lenderId;
+            const row = e.target.closest('tr');
+            const lenderName = row.cells[1].textContent;
+            
+            if (!confirm(`Are you sure you want to approve ${lenderName}?`)) {
+                return;
+            }
+            
+            try {
+                // Show loading state
+                e.target.disabled = true;
+                e.target.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing';
+                
+                // Get auth token
+                const token = localStorage.getItem('authToken');
+                if (!token) {
+                    throw new Error('Not authenticated');
+                }
+                
+                // Call API to approve lender
+                const response = await fetch(`/api/admin/lenders/${lenderId}/approve`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.message || 'Failed to approve lender');
+                }
+                
+                // Remove from table
+                row.remove();
+                
+                // Update active lenders count
+                const activeCount = parseInt(document.getElementById('activeLenders').textContent.replace(/,/g, ''));
+                document.getElementById('activeLenders').textContent = (activeCount + 1).toLocaleString();
+                
+                // Show success message
+                alert(`${lenderName} has been approved successfully!`);
+                
+            } catch (error) {
+                console.error('Error approving lender:', error);
+                alert('Failed to approve lender: ' + error.message);
+                e.target.disabled = false;
+                e.target.textContent = 'Approve';
+            }
+        }
+        
+        async function rejectLender(e) {
+            const lenderId = e.target.dataset.lenderId;
+            const row = e.target.closest('tr');
+            const lenderName = row.cells[1].textContent;
+            
+            if (!confirm(`Are you sure you want to reject ${lenderName}?`)) return;
+            
+            try {
+                // Show loading state
+                e.target.disabled = true;
+                e.target.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing';
+                
+                // Get auth token
+                const token = localStorage.getItem('authToken');
+                if (!token) {
+                    throw new Error('Not authenticated');
+                }
+                
+                // Call API to reject lender
+                const response = await fetch(`/api/admin/lenders/${lenderId}/reject`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.message || 'Failed to reject lender');
+                }
+                
+                // Remove from table
+                row.remove();
+                
+                // Show success message
+                alert(`${lenderName} has been rejected.`);
+                
+            } catch (error) {
+                console.error('Error rejecting lender:', error);
+                alert('Failed to reject lender: ' + error.message);
+                e.target.disabled = false;
+                e.target.textContent = 'Reject';
+            }
+        }
+        
+        async function processPayment() {
+            const amount = parseFloat(document.getElementById('paymentAmount').value);
+            const method = document.getElementById('paymentMethod').value;
+            
+            if (!amount || isNaN(amount)) {
+                alert('Please enter a valid amount');
+                return;
+            }
+            
+            try {
+                // Show processing state
+                const confirmBtn = document.getElementById('confirmPayment');
+                confirmBtn.disabled = true;
+                confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing';
+                
+                if (method === 'card') {
+                    // Process card payment via Paystack
+                    const handler = PaystackPop.setup({
+                        key: 'pk_test_your_paystack_key',
+                        email: 'admin@loanconnect.co.za',
+                        amount: amount * 100, // in kobo
+                        currency: 'ZAR',
+                        ref: 'TXN-' + Math.floor(Math.random() * 1000000),
+                        callback: function(response) {
+                            alert('Payment completed! Reference: ' + response.reference);
+                            // Close modal and update balance
+                            bootstrap.Modal.getInstance(document.getElementById('paymentModal')).hide();
+                            updateWalletBalance();
+                            confirmBtn.disabled = false;
+                            confirmBtn.textContent = 'Confirm Payment';
+                        },
+                        onClose: function() {
+                            alert('Payment window closed');
+                            confirmBtn.disabled = false;
+                            confirmBtn.textContent = 'Confirm Payment';
+                        }
+                    });
+                    handler.openIframe();
+                } else {
+                    // Simulate processing delay
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    
+                    // Process wallet/bank payment
+                    alert(`Payment of R${amount.toFixed(2)} processed via ${method}`);
+                    
+                    // Close modal and update balance
+                    bootstrap.Modal.getInstance(document.getElementById('paymentModal')).hide();
+                    updateWalletBalance();
+                    confirmBtn.disabled = false;
+                    confirmBtn.textContent = 'Confirm Payment';
+                }
+                
+            } catch (error) {
+                console.error('Payment processing error:', error);
+                alert('Payment failed. Please try again.');
+                document.getElementById('confirmPayment').disabled = false;
+                document.getElementById('confirmPayment').textContent = 'Confirm Payment';
+            }
+        }
+        
+        function updateWalletBalance() {
+            // In real app, fetch from API
+            // For demo, we'll just increment the balance by a random amount
+            const currentBalance = parseFloat(document.getElementById('walletBalance').textContent.replace(/,/g, '') || 0);
+            const newBalance = currentBalance + Math.random() * 1000;
+            document.getElementById('walletBalance').textContent = newBalance.toFixed(2);
+            document.getElementById('systemBalance').textContent = 'R' + newBalance.toFixed(2);
+        }
+        
+        // Section-specific data loading functions
+        
+        async function loadEnquiries() {
+            try {
+                const token = localStorage.getItem('authToken');
+                const tbody = document.getElementById('enquiriesTable');
+                
+                if (!token) {
+                    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Please log in to view enquiries</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4">Loading enquiries...</td></tr>';
+                
+                const response = await fetch('/api/applications', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to load enquiries');
+                }
+                
+                const applications = await response.json();
+                
+                if (applications.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">No enquiries found</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = applications.map(app => `
+                    <tr>
+                        <td>${app._id.substring(18)}</td>
+                        <td>${app.borrower?.fullName || 'N/A'}</td>
+                        <td class="fw-bold">R${(app.loanDetails?.amount || 0).toLocaleString()}</td>
+                        <td>${app.selectedLender?.companyName || 'Unassigned'}</td>
+                        <td><span class="badge bg-${app.status === 'approved' ? 'success' : app.status === 'pending' ? 'warning' : 'secondary'}">${app.status || 'N/A'}</span></td>
+                        <td>${formatDate(app.createdAt)}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" onclick="viewEnquiry('${app._id}')">
+                                <i class="fas fa-eye"></i> View
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+                
+            } catch (error) {
+                console.error('Error loading enquiries:', error);
+                document.getElementById('enquiriesTable').innerHTML = 
+                    '<tr><td colspan="7" class="text-center text-danger">Failed to load enquiries. Please try again.</td></tr>';
+            }
+        }
+        
+        async function loadLenders() {
+            try {
+                const token = localStorage.getItem('authToken');
+                const tbody = document.getElementById('lendersTable');
+                
+                if (!token) {
+                    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Please log in to view lenders</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4">Loading lenders...</td></tr>';
+                
+                const response = await fetch('/api/lenders', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to load lenders');
+                }
+                
+                const lenders = await response.json();
+                
+                if (lenders.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">No lenders found</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = lenders.map(lender => `
+                    <tr>
+                        <td>${lender._id.substring(18)}</td>
+                        <td>${lender.companyName || 'N/A'}</td>
+                        <td>${lender.contactPerson || 'N/A'}</td>
+                        <td>${lender.email || 'N/A'}</td>
+                        <td><span class="badge bg-${lender.approvalStatus === 'approved' ? 'success' : lender.approvalStatus === 'pending' ? 'warning' : 'danger'}">${lender.approvalStatus || 'N/A'}</span></td>
+                        <td>${formatDate(lender.createdAt)}</td>
+                        <td>
+                            ${lender.approvalStatus === 'pending' ? `
+                                <button class="btn btn-sm btn-success me-1 approve-btn" data-lender-id="${lender._id}" onclick="approveLenderFromList('${lender._id}')">Approve</button>
+                                <button class="btn btn-sm btn-danger reject-btn" data-lender-id="${lender._id}" onclick="rejectLenderFromList('${lender._id}')">Reject</button>
+                            ` : `
+                                <button class="btn btn-sm btn-outline-primary" onclick="viewLender('${lender._id}')">
+                                    <i class="fas fa-eye"></i> View
+                                </button>
+                            `}
+                        </td>
+                    </tr>
+                `).join('');
+                
+            } catch (error) {
+                console.error('Error loading lenders:', error);
+                document.getElementById('lendersTable').innerHTML = 
+                    '<tr><td colspan="7" class="text-center text-danger">Failed to load lenders. Please try again.</td></tr>';
+            }
+        }
+        
+        function filterLenders(status) {
+            const rows = document.querySelectorAll('#lendersTable tr');
+            rows.forEach(row => {
+                if (status === 'all') {
+                    row.style.display = '';
+                } else {
+                    const badge = row.querySelector('.badge');
+                    if (badge && badge.textContent.toLowerCase() === status) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                }
+            });
+        }
+        
+        async function approveLenderFromList(lenderId) {
+            try {
+                const token = localStorage.getItem('authToken');
+                if (!token) throw new Error('Not authenticated');
+                
+                const response = await fetch(`/api/admin/lenders/${lenderId}/approve`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) throw new Error('Failed to approve lender');
+                
+                alert('Lender approved successfully!');
+                loadLenders(); // Reload the list
+                
+            } catch (error) {
+                console.error('Error approving lender:', error);
+                alert('Failed to approve lender: ' + error.message);
+            }
+        }
+        
+        async function rejectLenderFromList(lenderId) {
+            try {
+                const token = localStorage.getItem('authToken');
+                if (!token) throw new Error('Not authenticated');
+                
+                if (!confirm('Are you sure you want to reject this lender?')) return;
+                
+                const response = await fetch(`/api/admin/lenders/${lenderId}/reject`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) throw new Error('Failed to reject lender');
+                
+                alert('Lender rejected successfully.');
+                loadLenders(); // Reload the list
+                
+            } catch (error) {
+                console.error('Error rejecting lender:', error);
+                alert('Failed to reject lender: ' + error.message);
+            }
+        }
+        
+        async function loadWalletData() {
+            try {
+                const token = localStorage.getItem('authToken');
+                
+                if (!token) {
+                    document.getElementById('walletSystemBalance').textContent = 'R0.00';
+                    document.getElementById('pendingPayouts').textContent = 'R0.00';
+                    document.getElementById('totalProcessed').textContent = 'R0.00';
+                    document.getElementById('walletTransactionsTable').innerHTML = 
+                        '<tr><td colspan="6" class="text-center text-muted">Please log in to view wallet data</td></tr>';
+                    return;
+                }
+                
+                // Load wallet stats from admin stats API
+                const statsResponse = await fetch('/api/admin/stats', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (statsResponse.ok) {
+                    const stats = await statsResponse.json();
+                    document.getElementById('walletSystemBalance').textContent = 'R' + stats.systemBalance.toFixed(2);
+                    document.getElementById('pendingPayouts').textContent = 'R' + (stats.systemBalance * 0.15).toFixed(2); // Demo calculation
+                    document.getElementById('totalProcessed').textContent = 'R' + (stats.todaysRevenue * 30).toFixed(2); // Demo calculation
+                }
+                
+                // Load transactions
+                const transactionsResponse = await fetch('/api/admin/transactions', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (transactionsResponse.ok) {
+                    const transactions = await transactionsResponse.json();
+                    const tbody = document.getElementById('walletTransactionsTable');
+                    
+                    if (transactions.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No transactions found</td></tr>';
+                    } else {
+                        let balance = 0;
+                        tbody.innerHTML = transactions.slice(0, 20).map(txn => {
+                            balance += txn.amount || 0;
+                            return `
+                                <tr>
+                                    <td>${txn.date || 'N/A'}</td>
+                                    <td>${txn.type || 'N/A'}</td>
+                                    <td>${txn.lender || 'N/A'} - ${txn.enquiry || 'N/A'}</td>
+                                    <td class="fw-bold text-success">R${(txn.amount || 0).toFixed(2)}</td>
+                                    <td>R${balance.toFixed(2)}</td>
+                                    <td><span class="badge bg-${txn.status === 'Completed' ? 'success' : 'warning'}">${txn.status || 'N/A'}</span></td>
+                                </tr>
+                            `;
+                        }).join('');
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Error loading wallet data:', error);
+                document.getElementById('walletTransactionsTable').innerHTML = 
+                    '<tr><td colspan="6" class="text-center text-danger">Failed to load wallet data. Please try again.</td></tr>';
+            }
+        }
+        
+        async function loadTransactions() {
+            try {
+                const token = localStorage.getItem('authToken');
+                const tbody = document.getElementById('transactionsTable');
+                
+                if (!token) {
+                    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Please log in to view transactions</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4">Loading transactions...</td></tr>';
+                
+                const response = await fetch('/api/admin/transactions', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to load transactions');
+                }
+                
+                const transactions = await response.json();
+                
+                if (transactions.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">No transactions found</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = transactions.map(txn => `
+                    <tr>
+                        <td>${txn.id || 'N/A'}</td>
+                        <td>${txn.lender || 'N/A'}</td>
+                        <td class="fw-bold">R${(txn.amount || 0).toFixed(2)}</td>
+                        <td>${txn.type || 'N/A'}</td>
+                        <td>${txn.enquiry || 'N/A'}</td>
+                        <td>${txn.date || 'N/A'}</td>
+                        <td><span class="badge bg-${txn.status === 'Completed' ? 'success' : txn.status === 'Pending' ? 'warning' : 'secondary'}">${txn.status || 'N/A'}</span></td>
+                    </tr>
+                `).join('');
+                
+            } catch (error) {
+                console.error('Error loading transactions:', error);
+                document.getElementById('transactionsTable').innerHTML = 
+                    '<tr><td colspan="7" class="text-center text-danger">Failed to load transactions. Please try again.</td></tr>';
+            }
+        }
+        
+        function viewEnquiry(enquiryId) {
+            alert('View enquiry details for ID: ' + enquiryId + '\nThis feature will be implemented in a future update.');
+        }
+        
+        function viewLender(lenderId) {
+            alert('View lender details for ID: ' + lenderId + '\nThis feature will be implemented in a future update.');
+        }
+        
+        // Handle system settings form submission
+        document.addEventListener('DOMContentLoaded', function() {
+            const systemSettingsForm = document.getElementById('systemSettingsForm');
+            if (systemSettingsForm) {
+                systemSettingsForm.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    
+                    const enquiryFee = document.getElementById('enquiryFee').value;
+                    const platformCommission = document.getElementById('platformCommission').value;
+                    const autoApprovalThreshold = document.getElementById('autoApprovalThreshold').value;
+                    
+                    try {
+                        // Store in localStorage for now (would be backend API in production)
+                        localStorage.setItem('systemSettings', JSON.stringify({
+                            enquiryFee: parseFloat(enquiryFee),
+                            platformCommission: parseFloat(platformCommission),
+                            autoApprovalThreshold: parseFloat(autoApprovalThreshold),
+                            updatedAt: new Date().toISOString()
+                        }));
+                        
+                        // Show success message
+                        const successAlert = document.getElementById('settingsSaveSuccess');
+                        successAlert.style.display = 'block';
+                        setTimeout(() => {
+                            successAlert.style.display = 'none';
+                        }, 3000);
+                        
+                    } catch (error) {
+                        console.error('Error saving system settings:', error);
+                        alert('Failed to save system settings. Please try again.');
+                    }
+                });
+            }
+            
+            // Handle admin profile form submission
+            const adminProfileForm = document.getElementById('adminProfileForm');
+            if (adminProfileForm) {
+                adminProfileForm.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    
+                    const adminName = document.getElementById('adminName').value;
+                    const adminEmail = document.getElementById('adminEmail').value;
+                    
+                    try {
+                        // Store in localStorage for now (would be backend API in production)
+                        localStorage.setItem('adminProfile', JSON.stringify({
+                            name: adminName,
+                            email: adminEmail,
+                            updatedAt: new Date().toISOString()
+                        }));
+                        
+                        // Show success message
+                        const successAlert = document.getElementById('settingsSaveSuccess');
+                        successAlert.style.display = 'block';
+                        setTimeout(() => {
+                            successAlert.style.display = 'none';
+                        }, 3000);
+                        
+                    } catch (error) {
+                        console.error('Error saving admin profile:', error);
+                        alert('Failed to save admin profile. Please try again.');
+                    }
+                });
+            }
+            
+            // Load saved settings on page load
+            loadSavedSettings();
+        });
+        
+        function loadSavedSettings() {
+            try {
+                // Load system settings
+                const systemSettings = localStorage.getItem('systemSettings');
+                if (systemSettings) {
+                    const settings = JSON.parse(systemSettings);
+                    document.getElementById('enquiryFee').value = settings.enquiryFee || 110;
+                    document.getElementById('platformCommission').value = settings.platformCommission || 2.5;
+                    document.getElementById('autoApprovalThreshold').value = settings.autoApprovalThreshold || 5000;
+                }
+                
+                // Load admin profile
+                const adminProfile = localStorage.getItem('adminProfile');
+                if (adminProfile) {
+                    const profile = JSON.parse(adminProfile);
+                    document.getElementById('adminName').value = profile.name || 'Admin User';
+                    document.getElementById('adminEmail').value = profile.email || 'admin@loanconnect.co.za';
+                }
+            } catch (error) {
+                console.error('Error loading saved settings:', error);
+            }
+        }
+    </script>
+</body>
+</html>
