@@ -45,13 +45,13 @@ while True:
     results = float(num1) + float(num2)
     print(results/2)
     
-if op == "+" :
-    print(num1 + num2)
-elif op == "-": 
-    print(num1 - num2)
-elif op== "/":
-    print(num1 / num2)
-elif op == "*":
-    print(num1 * num2)
-else:
-    print("invelid operator")
+    if op == "+" :
+        print(num1 + num2)
+    elif op == "-": 
+        print(num1 - num2)
+    elif op== "/":
+        print(num1 / num2)
+    elif op == "*":
+        print(num1 * num2)
+    else:
+        print("invalid operator")
