@@ -54,4 +54,4 @@ while True:
     elif op == "*":
         print(num1 * num2)
     else:
-        print("invelid operator")
+        print("invalid operator")
