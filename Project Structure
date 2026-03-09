@@ -1,0 +1,10 @@
+lpn-investigation-system/
+├── server.js
+├── package.json
+├── railway.json
+├── .gitignore
+├── database.json
+└── public/
+    ├── index.html
+    ├── styles.css
+    └── app.js
