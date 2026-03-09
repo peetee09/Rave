@@ -1,25 +1,93 @@
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto');
+const { Pool } = require('pg');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ============= PERSISTENT STORAGE CONFIGURATION =============
-// For Railway: Use mounted volume if available
-const DB_PATH = process.env.RAILWAY_VOLUME_MOUNT_PATH 
-    ? path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH, 'database.json')
-    : path.join(__dirname, 'database.json');
+// ============= DATABASE CONFIGURATION =============
+// Railway managed PostgreSQL uses self-signed certificates; rejectUnauthorized
+// is intentionally set to false for its TLS setup. Certificate pinning or
+// a trusted CA bundle should be used if switching to a different provider.
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.NODE_ENV === 'production'
+        ? { rejectUnauthorized: false }
+        : false
+});
 
-// Ensure database directory exists
-const dbDir = path.dirname(DB_PATH);
-if (!fs.existsSync(dbDir)) {
-    fs.mkdirSync(dbDir, { recursive: true });
-    console.log(`📁 Created database directory: ${dbDir}`);
-}
+const getTimestamp = () =>
+    new Date().toLocaleString('en-CA', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    }).replace(',', '');
+
+// ============= SCHEMA INITIALIZATION =============
+const initializeDatabase = async () => {
+    const client = await pool.connect();
+    try {
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS investigations (
+                id          SERIAL PRIMARY KEY,
+                lpn         VARCHAR(255) NOT NULL,
+                team        VARCHAR(100) NOT NULL,
+                status      VARCHAR(100) NOT NULL DEFAULT 'New',
+                finding     TEXT,
+                wms         TEXT,
+                city        TEXT,
+                owner       VARCHAR(255),
+                timestamp   VARCHAR(50),
+                created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        `);
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS investigation_history (
+                id                 SERIAL PRIMARY KEY,
+                investigation_id   INTEGER NOT NULL
+                                   REFERENCES investigations(id) ON DELETE CASCADE,
+                action             TEXT NOT NULL,
+                finding            TEXT,
+                user_name          VARCHAR(255),
+                timestamp          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        `);
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS users (
+                id    SERIAL PRIMARY KEY,
+                name  VARCHAR(255) NOT NULL,
+                team  VARCHAR(100) NOT NULL,
+                role  VARCHAR(100) NOT NULL DEFAULT 'investigator'
+            )
+        `);
+
+        const { rows } = await client.query('SELECT COUNT(*) FROM users');
+        if (parseInt(rows[0].count, 10) === 0) {
+            await client.query(`
+                INSERT INTO users (name, team, role) VALUES
+                ('HRP User',        'HRP',       'investigator'),
+                ('Dispatch User',   'Dispatch',  'investigator'),
+                ('Claims User',     'Claims',    'investigator'),
+                ('City Floor User', 'CityFloor', 'investigator'),
+                ('Returns User',    'Returns',   'investigator')
+            `);
+            console.log('✅ Users seeded');
+        }
+
+        console.log('✅ Database schema ready');
+    } finally {
+        client.release();
+    }
+};
 
 // ============= MIDDLEWARE =============
 app.use(cors({
@@ -31,156 +99,65 @@ app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
-// Request logging middleware
 app.use((req, res, next) => {
     console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
     next();
 });
 
-// ============= DATABASE HELPERS =============
-const initializeDatabase = () => {
-    if (!fs.existsSync(DB_PATH)) {
-        const initialData = {
-            investigations: [
-                {
-                    id: 1,
-                    lpn: 'LPN-4821',
-                    team: 'HRP',
-                    status: 'In progress',
-                    finding: 'FD lock, chute scan #12',
-                    wms: 'chute 14 / 09:22',
-                    city: 'pending',
-                    owner: 'HRP',
-                    timestamp: new Date().toLocaleString('en-CA', { 
-                        year: 'numeric', 
-                        month: '2-digit', 
-                        day: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        hour12: false 
-                    }).replace(',', ''),
-                    history: [
-                        { 
-                            action: 'System initialized', 
-                            user: 'System', 
-                            timestamp: new Date().toISOString() 
-                        }
-                    ]
-                },
-                {
-                    id: 2,
-                    lpn: 'CARTON-723X',
-                    team: 'CityFloor',
-                    status: 'Awaiting City',
-                    finding: 'City non‑ack, label mismatch',
-                    wms: 'WCS: no scan',
-                    city: 'non‑ack',
-                    owner: 'CityFloor',
-                    timestamp: new Date().toLocaleString('en-CA', { 
-                        year: 'numeric', 
-                        month: '2-digit', 
-                        day: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        hour12: false 
-                    }).replace(',', ''),
-                    history: [
-                        { 
-                            action: 'System initialized', 
-                            user: 'System', 
-                            timestamp: new Date().toISOString() 
-                        }
-                    ]
-                }
-            ],
-            users: [
-                { id: 1, name: 'HRP User', team: 'HRP', role: 'investigator' },
-                { id: 2, name: 'Dispatch User', team: 'Dispatch', role: 'investigator' },
-                { id: 3, name: 'Claims User', team: 'Claims', role: 'investigator' },
-                { id: 4, name: 'City Floor User', team: 'CityFloor', role: 'investigator' },
-                { id: 5, name: 'Returns User', team: 'Returns', role: 'investigator' }
-            ],
-            metadata: {
-                lastUpdated: new Date().toISOString(),
-                version: '1.0.0',
-                environment: process.env.NODE_ENV || 'development'
-            }
-        };
-        fs.writeFileSync(DB_PATH, JSON.stringify(initialData, null, 2));
-        console.log('✅ Database initialized with sample data');
-    }
-};
+// ============= RATE LIMITING =============
+const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 300,                  // max requests per window per IP
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many requests, please try again later.' }
+});
 
-// File locking mechanism to prevent race conditions
-const lockFile = (callback) => {
-    const lockPath = `${DB_PATH}.lock`;
-    const lockId = crypto.randomBytes(16).toString('hex');
-    
-    const tryLock = () => {
-        try {
-            fs.writeFileSync(lockPath, lockId, { flag: 'wx' });
-            callback();
-            fs.unlinkSync(lockPath);
-        } catch (err) {
-            if (err.code === 'EEXIST') {
-                setTimeout(tryLock, 100);
-            } else {
-                console.error('Lock error:', err);
-                callback(new Error('Could not acquire lock'));
-            }
-        }
-    };
-    
-    tryLock();
-};
+// Apply to all /api routes
+app.use('/api', apiLimiter);
 
-const readDB = () => {
-    try {
-        const data = fs.readFileSync(DB_PATH, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        console.error('Error reading database:', error);
-        return null;
-    }
-};
-
-const writeDB = (data) => {
-    try {
-        data.metadata.lastUpdated = new Date().toISOString();
-        fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
-        return true;
-    } catch (error) {
-        console.error('Error writing database:', error);
-        return false;
-    }
-};
-
-// Initialize database on startup
-initializeDatabase();
+// ============= HELPERS =============
+const rowToInvestigation = (row) => ({
+    id:        row.id,
+    lpn:       row.lpn,
+    team:      row.team,
+    status:    row.status,
+    finding:   row.finding,
+    wms:       row.wms,
+    city:      row.city,
+    owner:     row.owner,
+    timestamp: row.timestamp
+    // History is fetched via GET /api/investigations/:id/history
+});
 
 // ============= API ENDPOINTS =============
 
 // Health check (critical for Railway)
-app.get('/api/health', (req, res) => {
-    const db = readDB();
-    res.json({ 
-        status: 'healthy', 
-        timestamp: new Date().toISOString(),
-        uptime: process.uptime(),
-        environment: process.env.NODE_ENV || 'development',
-        database: db ? `active (${db.investigations.length} records)` : 'error',
-        version: db?.metadata?.version || 'unknown'
-    });
+app.get('/api/health', async (req, res) => {
+    try {
+        const { rows } = await pool.query('SELECT COUNT(*) FROM investigations');
+        const count = parseInt(rows[0].count, 10);
+        res.json({
+            status: 'healthy',
+            timestamp: new Date().toISOString(),
+            uptime: process.uptime(),
+            environment: process.env.NODE_ENV || 'development',
+            database: `active (${count} records)`,
+            version: '1.0.0'
+        });
+    } catch (error) {
+        console.error('Health check error:', error);
+        res.status(503).json({ status: 'error', error: error.message });
+    }
 });
 
 // Get all investigations
-app.get('/api/investigations', (req, res) => {
+app.get('/api/investigations', async (req, res) => {
     try {
-        const db = readDB();
-        if (!db) {
-            return res.status(500).json({ error: 'Database unavailable' });
-        }
-        res.json(db.investigations);
+        const { rows } = await pool.query(
+            'SELECT * FROM investigations ORDER BY id DESC'
+        );
+        res.json(rows.map(rowToInvestigation));
     } catch (error) {
         console.error('Error in GET /investigations:', error);
         res.status(500).json({ error: error.message });
@@ -188,254 +165,231 @@ app.get('/api/investigations', (req, res) => {
 });
 
 // Get single investigation by ID
-app.get('/api/investigations/:id', (req, res) => {
+app.get('/api/investigations/:id', async (req, res) => {
     try {
-        const db = readDB();
-        if (!db) {
-            return res.status(500).json({ error: 'Database unavailable' });
-        }
-        const investigation = db.investigations.find(i => i.id === parseInt(req.params.id));
-        if (!investigation) {
+        const id = parseInt(req.params.id, 10);
+        const { rows } = await pool.query(
+            'SELECT * FROM investigations WHERE id = $1',
+            [id]
+        );
+        if (rows.length === 0) {
             return res.status(404).json({ error: 'Investigation not found' });
         }
-        res.json(investigation);
+        res.json(rowToInvestigation(rows[0]));
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
 // Create new investigation
-app.post('/api/investigations', (req, res) => {
-    lockFile((err) => {
-        if (err) {
-            return res.status(503).json({ error: 'System busy, try again' });
-        }
-        
-        try {
-            const db = readDB();
-            if (!db) {
-                return res.status(500).json({ error: 'Database unavailable' });
-            }
-            
-            const newId = db.investigations.length > 0 
-                ? Math.max(...db.investigations.map(i => i.id)) + 1 
-                : 1;
-            
-            const timestamp = new Date().toLocaleString('en-CA', { 
-                year: 'numeric', 
-                month: '2-digit', 
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: false 
-            }).replace(',', '');
-            
-            const newInvestigation = {
-                id: newId,
-                ...req.body,
-                timestamp: timestamp,
-                history: [
-                    { 
-                        action: 'Created', 
-                        user: req.body.owner || req.body.team || 'System', 
-                        timestamp: new Date().toISOString() 
-                    }
-                ]
-            };
-            
-            db.investigations.push(newInvestigation);
-            
-            if (writeDB(db)) {
-                res.status(201).json(newInvestigation);
-            } else {
-                res.status(500).json({ error: 'Failed to save to database' });
-            }
-        } catch (error) {
-            console.error('Error in POST /investigations:', error);
-            res.status(500).json({ error: error.message });
-        }
-    });
+app.post('/api/investigations', async (req, res) => {
+    try {
+        const { lpn, team, status = 'New', finding, wms, city, owner } = req.body;
+        const timestamp = getTimestamp();
+
+        const { rows } = await pool.query(
+            `INSERT INTO investigations (lpn, team, status, finding, wms, city, owner, timestamp)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+             RETURNING *`,
+            [lpn, team, status, finding, wms, city, owner || team, timestamp]
+        );
+
+        const inv = rows[0];
+
+        await pool.query(
+            `INSERT INTO investigation_history (investigation_id, action, user_name)
+             VALUES ($1, $2, $3)`,
+            [inv.id, 'Created', owner || team || 'System']
+        );
+
+        res.status(201).json(rowToInvestigation(inv));
+    } catch (error) {
+        console.error('Error in POST /investigations:', error);
+        res.status(500).json({ error: error.message });
+    }
 });
 
 // Update investigation
-app.put('/api/investigations/:id', (req, res) => {
-    lockFile((err) => {
-        if (err) {
-            return res.status(503).json({ error: 'System busy, try again' });
+app.put('/api/investigations/:id', async (req, res) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        const id = parseInt(req.params.id, 10);
+        const { rows: existing } = await client.query(
+            'SELECT * FROM investigations WHERE id = $1',
+            [id]
+        );
+
+        if (existing.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Investigation not found' });
         }
-        
-        try {
-            const db = readDB();
-            if (!db) {
-                return res.status(500).json({ error: 'Database unavailable' });
-            }
-            
-            const index = db.investigations.findIndex(i => i.id === parseInt(req.params.id));
-            
-            if (index === -1) {
-                return res.status(404).json({ error: 'Investigation not found' });
-            }
-            
-            const oldData = db.investigations[index];
-            const timestamp = new Date().toLocaleString('en-CA', { 
-                year: 'numeric', 
-                month: '2-digit', 
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: false 
-            }).replace(',', '');
-            
-            const updatedData = {
-                ...oldData,
-                ...req.body,
-                id: oldData.id,
-                timestamp: timestamp
-            };
-            
-            // Add to history if there's a new action or finding
-            if (req.body.action || req.body.finding) {
-                if (!updatedData.history) updatedData.history = [];
-                updatedData.history.push({
-                    action: req.body.action || 'Updated',
-                    finding: req.body.finding || '',
-                    user: req.body.user || req.body.team || 'System',
-                    timestamp: new Date().toISOString()
-                });
-            }
-            
-            db.investigations[index] = updatedData;
-            
-            if (writeDB(db)) {
-                res.json(updatedData);
-            } else {
-                res.status(500).json({ error: 'Failed to save to database' });
-            }
-        } catch (error) {
-            console.error('Error in PUT /investigations:', error);
-            res.status(500).json({ error: error.message });
+
+        const old = existing[0];
+        const timestamp = getTimestamp();
+
+        const { rows } = await client.query(
+            `UPDATE investigations
+             SET lpn       = COALESCE($1, lpn),
+                 team      = COALESCE($2, team),
+                 status    = COALESCE($3, status),
+                 finding   = COALESCE($4, finding),
+                 wms       = COALESCE($5, wms),
+                 city      = COALESCE($6, city),
+                 owner     = COALESCE($7, owner),
+                 timestamp = $8,
+                 updated_at = NOW()
+             WHERE id = $9
+             RETURNING *`,
+            [
+                req.body.lpn    ?? null,
+                req.body.team   ?? null,
+                req.body.status   ?? null,
+                req.body.finding  ?? null,
+                req.body.wms    ?? null,
+                req.body.city   ?? null,
+                req.body.owner  ?? null,
+                timestamp,
+                id
+            ]
+        );
+
+        if (req.body.action || req.body.finding) {
+            await client.query(
+                `INSERT INTO investigation_history (investigation_id, action, finding, user_name)
+                 VALUES ($1, $2, $3, $4)`,
+                [
+                    id,
+                    req.body.action || 'Updated',
+                    req.body.finding || null,
+                    req.body.user || req.body.team || old.owner || 'System'
+                ]
+            );
         }
-    });
+
+        await client.query('COMMIT');
+        res.json(rowToInvestigation(rows[0]));
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Error in PUT /investigations:', error);
+        res.status(500).json({ error: error.message });
+    } finally {
+        client.release();
+    }
 });
 
 // Delete investigation
-app.delete('/api/investigations/:id', (req, res) => {
-    lockFile((err) => {
-        if (err) {
-            return res.status(503).json({ error: 'System busy, try again' });
+app.delete('/api/investigations/:id', async (req, res) => {
+    try {
+        const id = parseInt(req.params.id, 10);
+        const { rowCount } = await pool.query(
+            'DELETE FROM investigations WHERE id = $1',
+            [id]
+        );
+
+        if (rowCount === 0) {
+            return res.status(404).json({ error: 'Investigation not found' });
         }
-        
-        try {
-            const db = readDB();
-            if (!db) {
-                return res.status(500).json({ error: 'Database unavailable' });
-            }
-            
-            const index = db.investigations.findIndex(i => i.id === parseInt(req.params.id));
-            
-            if (index === -1) {
-                return res.status(404).json({ error: 'Investigation not found' });
-            }
-            
-            db.investigations.splice(index, 1);
-            
-            if (writeDB(db)) {
-                res.status(204).send();
-            } else {
-                res.status(500).json({ error: 'Failed to save to database' });
-            }
-        } catch (error) {
-            console.error('Error in DELETE /investigations:', error);
-            res.status(500).json({ error: error.message });
-        }
-    });
+
+        res.status(204).send();
+    } catch (error) {
+        console.error('Error in DELETE /investigations:', error);
+        res.status(500).json({ error: error.message });
+    }
 });
 
 // Bulk upload investigations
-app.post('/api/investigations/bulk', (req, res) => {
-    lockFile((err) => {
-        if (err) {
-            return res.status(503).json({ error: 'System busy, try again' });
-        }
-        
-        try {
-            const db = readDB();
-            if (!db) {
-                return res.status(500).json({ error: 'Database unavailable' });
-            }
-            
-            const timestamp = new Date().toLocaleString('en-CA', { 
-                year: 'numeric', 
-                month: '2-digit', 
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: false 
-            }).replace(',', '');
-            
-            const nextId = db.investigations.length > 0 
-                ? Math.max(...db.investigations.map(i => i.id)) + 1 
-                : 1;
-            
-            const newInvestigations = req.body.map((item, index) => ({
-                id: nextId + index,
-                ...item,
-                timestamp: timestamp,
-                history: [
-                    { 
-                        action: 'Bulk Created', 
-                        user: item.owner || item.team || 'System', 
-                        timestamp: new Date().toISOString() 
-                    }
+app.post('/api/investigations/bulk', async (req, res) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        const items = Array.isArray(req.body) ? req.body : [];
+        const timestamp = getTimestamp();
+        const created = [];
+
+        for (const item of items) {
+            const { rows } = await client.query(
+                `INSERT INTO investigations (lpn, team, status, finding, wms, city, owner, timestamp)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                 RETURNING *`,
+                [
+                    item.lpn,
+                    item.team,
+                    item.status || 'New',
+                    item.finding,
+                    item.wms,
+                    item.city,
+                    item.owner || item.team,
+                    timestamp
                 ]
-            }));
-            
-            db.investigations.push(...newInvestigations);
-            
-            if (writeDB(db)) {
-                res.status(201).json(newInvestigations);
-            } else {
-                res.status(500).json({ error: 'Failed to save to database' });
-            }
-        } catch (error) {
-            console.error('Error in POST /investigations/bulk:', error);
-            res.status(500).json({ error: error.message });
+            );
+
+            const inv = rows[0];
+
+            await client.query(
+                `INSERT INTO investigation_history (investigation_id, action, user_name)
+                 VALUES ($1, $2, $3)`,
+                [inv.id, 'Bulk Created', item.owner || item.team || 'System']
+            );
+
+            created.push(rowToInvestigation(inv));
         }
-    });
+
+        await client.query('COMMIT');
+        res.status(201).json(created);
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Error in POST /investigations/bulk:', error);
+        res.status(500).json({ error: error.message });
+    } finally {
+        client.release();
+    }
 });
 
 // Get statistics
-app.get('/api/stats', (req, res) => {
+app.get('/api/stats', async (req, res) => {
     try {
-        const db = readDB();
-        if (!db) {
-            return res.status(500).json({ error: 'Database unavailable' });
-        }
-        
-        const investigations = db.investigations;
-        
-        const stats = {
-            total: investigations.length,
+        const { rows } = await pool.query(`
+            SELECT
+                COUNT(*)                                                        AS total,
+                COUNT(*) FILTER (WHERE team = 'HRP')                           AS hrp,
+                COUNT(*) FILTER (WHERE team = 'Dispatch')                      AS dispatch,
+                COUNT(*) FILTER (WHERE team = 'Claims')                        AS claims,
+                COUNT(*) FILTER (WHERE team = 'CityFloor')                     AS cityfloor,
+                COUNT(*) FILTER (WHERE team = 'Returns')                       AS returns,
+                COUNT(*) FILTER (WHERE status = 'New')                         AS new,
+                COUNT(*) FILTER (WHERE status = 'In progress')                 AS inprogress,
+                COUNT(*) FILTER (WHERE status = 'Awaiting City')               AS awaitingcity,
+                COUNT(*) FILTER (WHERE status = 'Resolved')                    AS resolved,
+                COUNT(*) FILTER (WHERE status = 'Claim raised')                AS claimraised,
+                COUNT(*) FILTER (WHERE status = 'Returned')                    AS returned,
+                MAX(updated_at)                                                 AS last_updated
+            FROM investigations
+        `);
+
+        const r = rows[0];
+        res.json({
+            total: parseInt(r.total, 10),
             byTeam: {
-                HRP: investigations.filter(i => i.team === 'HRP').length,
-                Dispatch: investigations.filter(i => i.team === 'Dispatch').length,
-                Claims: investigations.filter(i => i.team === 'Claims').length,
-                CityFloor: investigations.filter(i => i.team === 'CityFloor').length,
-                Returns: investigations.filter(i => i.team === 'Returns').length
+                HRP:       parseInt(r.hrp, 10),
+                Dispatch:  parseInt(r.dispatch, 10),
+                Claims:    parseInt(r.claims, 10),
+                CityFloor: parseInt(r.cityfloor, 10),
+                Returns:   parseInt(r.returns, 10)
             },
             byStatus: {
-                New: investigations.filter(i => i.status === 'New').length,
-                'In progress': investigations.filter(i => i.status === 'In progress').length,
-                'Awaiting City': investigations.filter(i => i.status === 'Awaiting City').length,
-                Resolved: investigations.filter(i => i.status === 'Resolved').length,
-                'Claim raised': investigations.filter(i => i.status === 'Claim raised').length,
-                Returned: investigations.filter(i => i.status === 'Returned').length
+                New:             parseInt(r.new, 10),
+                'In progress':   parseInt(r.inprogress, 10),
+                'Awaiting City': parseInt(r.awaitingcity, 10),
+                Resolved:        parseInt(r.resolved, 10),
+                'Claim raised':  parseInt(r.claimraised, 10),
+                Returned:        parseInt(r.returned, 10)
             },
-            lastUpdated: db.metadata.lastUpdated,
-            version: db.metadata.version
-        };
-        
-        res.json(stats);
+            lastUpdated: r.last_updated || new Date().toISOString(),
+            version: '1.0.0'
+        });
     } catch (error) {
         console.error('Error in GET /stats:', error);
         res.status(500).json({ error: error.message });
@@ -443,18 +397,27 @@ app.get('/api/stats', (req, res) => {
 });
 
 // Get history for an investigation
-app.get('/api/investigations/:id/history', (req, res) => {
+app.get('/api/investigations/:id/history', async (req, res) => {
     try {
-        const db = readDB();
-        if (!db) {
-            return res.status(500).json({ error: 'Database unavailable' });
-        }
-        
-        const investigation = db.investigations.find(i => i.id === parseInt(req.params.id));
-        if (!investigation) {
+        const id = parseInt(req.params.id, 10);
+
+        const { rowCount } = await pool.query(
+            'SELECT 1 FROM investigations WHERE id = $1',
+            [id]
+        );
+        if (rowCount === 0) {
             return res.status(404).json({ error: 'Investigation not found' });
         }
-        res.json(investigation.history || []);
+
+        const { rows } = await pool.query(
+            `SELECT action, finding, user_name AS "user", timestamp
+             FROM investigation_history
+             WHERE investigation_id = $1
+             ORDER BY timestamp ASC`,
+            [id]
+        );
+
+        res.json(rows);
     } catch (error) {
         console.error('Error in GET /history:', error);
         res.status(500).json({ error: error.message });
@@ -462,13 +425,10 @@ app.get('/api/investigations/:id/history', (req, res) => {
 });
 
 // Get all users
-app.get('/api/users', (req, res) => {
+app.get('/api/users', async (req, res) => {
     try {
-        const db = readDB();
-        if (!db) {
-            return res.status(500).json({ error: 'Database unavailable' });
-        }
-        res.json(db.users);
+        const { rows } = await pool.query('SELECT * FROM users ORDER BY id');
+        res.json(rows);
     } catch (error) {
         console.error('Error in GET /users:', error);
         res.status(500).json({ error: error.message });
@@ -476,37 +436,39 @@ app.get('/api/users', (req, res) => {
 });
 
 // Search investigations
-app.get('/api/search', (req, res) => {
+app.get('/api/search', async (req, res) => {
     try {
-        const db = readDB();
-        if (!db) {
-            return res.status(500).json({ error: 'Database unavailable' });
-        }
-        
         const { q, team, status } = req.query;
-        
-        let results = db.investigations;
-        
+
+        let query = 'SELECT * FROM investigations WHERE TRUE';
+        const params = [];
+
         if (q) {
-            const query = q.toLowerCase();
-            results = results.filter(i => 
-                i.lpn.toLowerCase().includes(query) ||
-                i.finding.toLowerCase().includes(query) ||
-                i.owner.toLowerCase().includes(query) ||
-                (i.wms && i.wms.toLowerCase().includes(query)) ||
-                (i.city && i.city.toLowerCase().includes(query))
-            );
+            params.push(`%${q}%`);
+            const idx = params.length;
+            query += ` AND (
+                lpn     ILIKE $${idx} OR
+                finding ILIKE $${idx} OR
+                owner   ILIKE $${idx} OR
+                wms     ILIKE $${idx} OR
+                city    ILIKE $${idx}
+            )`;
         }
-        
+
         if (team) {
-            results = results.filter(i => i.team === team);
+            params.push(team);
+            query += ` AND team = $${params.length}`;
         }
-        
+
         if (status) {
-            results = results.filter(i => i.status === status);
+            params.push(status);
+            query += ` AND status = $${params.length}`;
         }
-        
-        res.json(results);
+
+        query += ' ORDER BY id DESC';
+
+        const { rows } = await pool.query(query, params);
+        res.json(rows.map(rowToInvestigation));
     } catch (error) {
         console.error('Error in GET /search:', error);
         res.status(500).json({ error: error.message });
@@ -514,19 +476,23 @@ app.get('/api/search', (req, res) => {
 });
 
 // Database backup endpoint
-app.get('/api/backup', (req, res) => {
+app.get('/api/backup', async (req, res) => {
     try {
-        const db = readDB();
-        if (!db) {
-            return res.status(500).json({ error: 'Database unavailable' });
-        }
-        
-        const backup = {
-            ...db,
+        const [invResult, usersResult] = await Promise.all([
+            pool.query('SELECT * FROM investigations ORDER BY id'),
+            pool.query('SELECT * FROM users ORDER BY id')
+        ]);
+
+        res.json({
+            investigations: invResult.rows.map(rowToInvestigation),
+            users: usersResult.rows,
+            metadata: {
+                lastUpdated: new Date().toISOString(),
+                version: '1.0.0',
+                environment: process.env.NODE_ENV || 'development'
+            },
             backupTimestamp: new Date().toISOString()
-        };
-        
-        res.json(backup);
+        });
     } catch (error) {
         console.error('Error in GET /backup:', error);
         res.status(500).json({ error: error.message });
@@ -550,11 +516,18 @@ app.use((err, req, res, next) => {
 });
 
 // ============= START SERVER =============
-app.listen(PORT, () => {
-    console.log(`🚀 LPN Investigation System deployed successfully`);
-    console.log(`📡 Server running on port: ${PORT}`);
-    console.log(`💾 Database path: ${DB_PATH}`);
-    console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`🔗 Local URL: http://localhost:${PORT}`);
-    console.log(`📊 API available at: http://localhost:${PORT}/api`);
-});
+initializeDatabase()
+    .then(() => {
+        app.listen(PORT, () => {
+            console.log(`🚀 LPN Investigation System deployed successfully`);
+            console.log(`📡 Server running on port: ${PORT}`);
+            console.log(`🗄️  Database: PostgreSQL (Railway managed)`);
+            console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+            console.log(`🔗 Local URL: http://localhost:${PORT}`);
+            console.log(`📊 API available at: http://localhost:${PORT}/api`);
+        });
+    })
+    .catch((err) => {
+        console.error('❌ Failed to initialize database:', err);
+        process.exit(1);
+    });

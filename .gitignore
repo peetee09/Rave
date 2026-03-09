@@ -28,6 +28,8 @@ logs/
 .railway/
 tmp/
 
-# Database backup (but not the main db)
+# Legacy flat-file database (replaced by PostgreSQL)
+database.json
+database.json.lock
 database-backup*.json
 *.tmp
