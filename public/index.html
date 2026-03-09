@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LPN Investigation System · Supply Chain</title>
+    <link rel="stylesheet" href="styles.css">
+    <meta name="description" content="Enterprise LPN tracking and investigation system">
+    <meta name="theme-color" content="#1e3a5f">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="main-header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <h1>🔍 LPN Investigation System</h1>
+                    <span class="badge" id="environment-badge">production</span>
+                </div>
+                <div class="connection-status" id="connectionStatus">
+                    <span class="status-dot"></span>
+                    <span id="statusText">Connecting to server...</span>
+                </div>
+            </div>
+            <div class="process-flow">
+                <div class="flow-step"><span class="step-num">1</span> Identify</div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-step"><span class="step-num">2</span> Search</div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-step"><span class="step-num">3</span> Check</div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-step"><span class="step-num">4</span> Log</div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-step"><span class="step-num">5</span> Update</div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Stats Dashboard -->
+            <section class="stats-dashboard" id="statsDashboard">
+                <div class="stat-card">
+                    <span class="stat-label">Total LPNs</span>
+                    <span class="stat-value" id="totalLPN">0</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">HRP</span>
+                    <span class="stat-value" id="hrpCount">0</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Dispatch</span>
+                    <span class="stat-value" id="dispatchCount">0</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Claims</span>
+                    <span class="stat-value" id="claimsCount">0</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">City Floor</span>
+                    <span class="stat-value" id="cityCount">0</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Returns</span>
+                    <span class="stat-value" id="returnsCount">0</span>
+                </div>
+                <div class="stat-card highlight">
+                    <span class="stat-label">Last Sync</span>
+                    <span class="stat-value" id="lastUpdated">-</span>
+                </div>
+            </section>
+
+            <!-- Manual Entry Form -->
+            <section class="entry-section">
+                <h3>➕ Manual Entry</h3>
+                <form id="manualEntryForm" class="manual-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>LPN *</label>
+                            <input type="text" id="lpnInput" placeholder="LPN-..." required>
+                        </div>
+                        <div class="form-group">
+                            <label>Team *</label>
+                            <select id="teamSelect" required>
+                                <option value="HRP">HRP</option>
+                                <option value="Dispatch">Dispatch</option>
+                                <option value="Claims">Claims</option>
+                                <option value="CityFloor">City Floor</option>
+                                <option value="Returns">Returns</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Status</label>
+                            <select id="statusSelect">
+                                <option value="New">New</option>
+                                <option value="In progress">In Progress</option>
+                                <option value="Awaiting City">Awaiting City</option>
+                                <option value="Resolved">Resolved</option>
+                                <option value="Claim raised">Claim Raised</option>
+                                <option value="Returned">Returned</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Finding</label>
+                            <input type="text" id="findingInput" placeholder="Initial finding...">
+                        </div>
+                        <div class="form-group">
+                            <label>WMS Result</label>
+                            <input type="text" id="wmsInput" placeholder="WMS result">
+                        </div>
+                        <div class="form-group">
+                            <label>City Ack</label>
+                            <input type="text" id="cityInput" placeholder="City acknowledgement">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Owner</label>
+                            <input type="text" id="ownerInput" placeholder="Owner (defaults to team)">
+                        </div>
+                        <div class="form-group">
+                            <label></label>
+                            <button type="submit" class="btn-primary">➕ Add Record</button>
+                        </div>
+                    </div>
+                </form>
+            </section>
+
+            <!-- Excel Upload Section -->
+            <section class="upload-section">
+                <h3>📤 Bulk Upload</h3>
+                <div class="upload-controls">
+                    <input type="file" id="excelFile" accept=".xlsx,.xls,.csv">
+                    <button class="btn-secondary" id="uploadBtn">Upload & Process</button>
+                    <button class="btn-outline" id="downloadTemplateBtn">Download Template</button>
+                </div>
+            </section>
+
+            <!-- Filter Bar -->
+            <section class="filter-section">
+                <div class="search-box">
+                    <input type="text" id="searchInput" placeholder="Search LPN, finding, any field...">
+                </div>
+                <div class="team-filters">
+                    <button class="filter-pill active" data-team="">All</button>
+                    <button class="filter-pill" data-team="HRP">HRP</button>
+                    <button class="filter-pill" data-team="Dispatch">Dispatch</button>
+                    <button class="filter-pill" data-team="Claims">Claims</button>
+                    <button class="filter-pill" data-team="CityFloor">City Floor</button>
+                    <button class="filter-pill" data-team="Returns">Returns</button>
+                </div>
+                <div class="status-filter">
+                    <select id="statusFilter">
+                        <option value="">All Status</option>
+                        <option value="New">New</option>
+                        <option value="In progress">In Progress</option>
+                        <option value="Awaiting City">Awaiting City</option>
+                        <option value="Resolved">Resolved</option>
+                        <option value="Claim raised">Claim Raised</option>
+                        <option value="Returned">Returned</option>
+                    </select>
+                </div>
+                <button class="btn-clear" id="clearFiltersBtn">Clear Filters</button>
+            </section>
+
+            <!-- Investigations Table -->
+            <section class="table-section">
+                <div class="table-header">
+                    <h3>📋 Active Investigations</h3>
+                    <span class="record-count" id="recordCount">0 records</span>
+                </div>
+                <div class="table-container">
+                    <table id="investigationsTable">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>LPN</th>
+                                <th>Team</th>
+                                <th>Status</th>
+                                <th>Finding</th>
+                                <th>WMS</th>
+                                <th>City</th>
+                                <th>Owner</th>
+                                <th>Last Updated</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            <tr>
+                                <td colspan="10" class="loading-row">Loading data from server...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- History Modal -->
+            <div id="historyModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Investigation History</h3>
+                        <span class="close-modal">&times;</span>
+                    </div>
+                    <div class="modal-body" id="historyContent">
+                        <!-- History items will be loaded here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Toast Notification -->
+            <div id="toast" class="toast"></div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="main-footer">
+            <div class="team-responsibilities">
+                <div class="resp-item"><strong>HRP:</strong> Reports, WMOS, city ack, FD lock</div>
+                <div class="resp-item"><strong>Dispatch:</strong> Floor errors, mismatched LPN, re-ship</div>
+                <div class="resp-item"><strong>Claims:</strong> Type30, costs, cross-reference</div>
+                <div class="resp-item"><strong>City Floor:</strong> Non-ack, handback, chute scans</div>
+                <div class="resp-item"><strong>Returns:</strong> Returns, disposition, close</div>
+            </div>
+            <div class="system-status">
+                <span>🟢 Connected to Railway</span>
+                <span>📊 Persistent Storage Active</span>
+                <span>⚡ Real-time Updates</span>
+            </div>
+        </footer>
+    </div>
+
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
