@@ -20,6 +20,7 @@
                 <div class="connection-status" id="connectionStatus">
                     <span class="status-dot"></span>
                     <span id="statusText">Connecting to server...</span>
+                    <span class="live-badge" id="liveBadge" style="display:none;">LIVE</span>
                 </div>
             </div>
             <div class="process-flow">
@@ -62,6 +63,18 @@
                 <div class="stat-card">
                     <span class="stat-label">Returns</span>
                     <span class="stat-value" id="returnsCount">0</span>
+                </div>
+                <div class="stat-card stat-danger">
+                    <span class="stat-label">Unresolved</span>
+                    <span class="stat-value" id="unresolvedCount">0</span>
+                </div>
+                <div class="stat-card stat-danger">
+                    <span class="stat-label">Overdue 36h+</span>
+                    <span class="stat-value" id="overdueCount">0</span>
+                </div>
+                <div class="stat-card stat-success">
+                    <span class="stat-label">Resolved</span>
+                    <span class="stat-value" id="resolvedCount">0</span>
                 </div>
                 <div class="stat-card highlight">
                     <span class="stat-label">Last Sync</span>
@@ -182,13 +195,14 @@
                                 <th>WMS</th>
                                 <th>City</th>
                                 <th>Owner</th>
+                                <th>Age</th>
                                 <th>Last Updated</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="tableBody">
                             <tr>
-                                <td colspan="10" class="loading-row">Loading data from server...</td>
+                                <td colspan="11" class="loading-row">Loading data from server...</td>
                             </tr>
                         </tbody>
                     </table>

@@ -118,15 +118,17 @@ app.use('/api', apiLimiter);
 
 // ============= HELPERS =============
 const rowToInvestigation = (row) => ({
-    id:        row.id,
-    lpn:       row.lpn,
-    team:      row.team,
-    status:    row.status,
-    finding:   row.finding,
-    wms:       row.wms,
-    city:      row.city,
-    owner:     row.owner,
-    timestamp: row.timestamp
+    id:         row.id,
+    lpn:        row.lpn,
+    team:       row.team,
+    status:     row.status,
+    finding:    row.finding,
+    wms:        row.wms,
+    city:       row.city,
+    owner:      row.owner,
+    timestamp:  row.timestamp,
+    created_at: row.created_at,
+    updated_at: row.updated_at
     // History is fetched via GET /api/investigations/:id/history
 });
 
@@ -255,7 +257,7 @@ app.put('/api/investigations/:id', async (req, res) => {
             ]
         );
 
-        if (req.body.action || req.body.finding) {
+        if (req.body.action || req.body.finding || req.body.wms || req.body.city || req.body.owner) {
             await client.query(
                 `INSERT INTO investigation_history (investigation_id, action, finding, user_name)
                  VALUES ($1, $2, $3, $4)`,
@@ -365,6 +367,13 @@ app.get('/api/stats', async (req, res) => {
                 COUNT(*) FILTER (WHERE status = 'Resolved')                    AS resolved,
                 COUNT(*) FILTER (WHERE status = 'Claim raised')                AS claimraised,
                 COUNT(*) FILTER (WHERE status = 'Returned')                    AS returned,
+                COUNT(*) FILTER (
+                    WHERE status NOT IN ('Resolved', 'Returned')
+                )                                                               AS unresolved,
+                COUNT(*) FILTER (
+                    WHERE status NOT IN ('Resolved', 'Returned')
+                      AND created_at < NOW() - INTERVAL '36 hours'
+                )                                                               AS overdue,
                 MAX(updated_at)                                                 AS last_updated
             FROM investigations
         `);
@@ -387,6 +396,8 @@ app.get('/api/stats', async (req, res) => {
                 'Claim raised':  parseInt(r.claimraised, 10),
                 Returned:        parseInt(r.returned, 10)
             },
+            unresolved:  parseInt(r.unresolved, 10),
+            overdue:     parseInt(r.overdue, 10),
             lastUpdated: r.last_updated || new Date().toISOString(),
             version: '1.0.0'
         });
