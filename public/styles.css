@@ -6,13 +6,15 @@
 }
 
 :root {
+    color-scheme: dark;
+
     /* Dark palette */
     --bg:              #10131e;
     --surface:         #161b2d;
     --surface-raised:  #1c2238;
     --surface-hover:   #222845;
     --border:          #252d48;
-    --border-light:    #1e2540;
+    --border-light:    #2a3356;
 
     /* Brand / accent */
     --primary:         #4a9dfa;
@@ -30,7 +32,7 @@
 
     /* Text */
     --text:            #bec8e4;
-    --text-muted:      #576080;
+    --text-muted:      #8896b8;
     --text-bright:     #dce4fc;
 
     --border-radius:   4px;
@@ -45,6 +47,20 @@ body {
     color: var(--text);
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
+}
+
+/* Prevent browser autofill from applying a white/light background */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--text);
+    -webkit-box-shadow: 0 0 0 1000px var(--surface) inset;
+    box-shadow: 0 0 0 1000px var(--surface) inset;
+    transition: background-color 5000s ease-in-out 0s;
+    caret-color: var(--text);
 }
 
 .app-container {
@@ -105,7 +121,7 @@ body {
     border: 1px solid var(--border);
     font-size: 0.8rem;
     border-radius: var(--border-radius);
-    color: var(--text-muted);
+    color: var(--text);
 }
 
 .status-dot {
@@ -158,7 +174,7 @@ body {
     align-items: center;
     gap: 0.3rem;
     font-size: 0.8rem;
-    color: var(--text-muted);
+    color: var(--text);
 }
 
 .step-num {
@@ -340,7 +356,7 @@ body {
     border: 1px solid var(--border);
     padding: 0.6rem 1.4rem;
     cursor: pointer;
-    color: var(--text-muted);
+    color: var(--text);
     border-radius: var(--border-radius);
     transition: all 0.2s;
     font-size: 0.85rem;
@@ -357,7 +373,7 @@ body {
     border: 1px solid var(--border);
     padding: 0.45rem 1rem;
     cursor: pointer;
-    color: var(--text-muted);
+    color: var(--text);
     font-size: 0.78rem;
     border-radius: var(--border-radius);
     transition: all 0.2s;
@@ -451,7 +467,7 @@ body {
     padding: 0.35rem 0.9rem;
     font-size: 0.72rem;
     cursor: pointer;
-    color: var(--text-muted);
+    color: var(--text);
     border-radius: var(--border-radius);
     transition: all 0.15s;
     font-weight: 500;
@@ -459,7 +475,7 @@ body {
 
 .filter-pill:hover {
     background: var(--surface-hover);
-    color: var(--text);
+    color: var(--text-bright);
 }
 
 .filter-pill.active {
@@ -512,7 +528,7 @@ body {
     padding: 0.25rem 0.9rem;
     border: 1px solid var(--border);
     font-size: 0.82rem;
-    color: var(--text-muted);
+    color: var(--text);
     border-radius: var(--border-radius);
 }
 
@@ -538,7 +554,7 @@ th {
     text-align: left;
     padding: 0.85rem 0.75rem;
     background: #12172a;
-    color: var(--text-muted);
+    color: var(--text-bright);
     font-weight: 600;
     border-bottom: 2px solid var(--border);
     font-size: 0.7rem;
@@ -684,7 +700,7 @@ tr.row-warning:hover td  { background: rgba(245,165,35,0.13); }
     padding: 0.2rem 0.6rem;
     font-size: 0.68rem;
     cursor: pointer;
-    color: var(--text-muted);
+    color: var(--text);
     border-radius: 3px;
     transition: all 0.15s;
     white-space: nowrap;
