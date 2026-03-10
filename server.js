@@ -29,6 +29,53 @@ const getTimestamp = () =>
         hour12: false
     }).replace(',', '');
 
+// ============= VALIDATION HELPERS =============
+const VALID_TEAMS      = new Set(['HRP', 'Dispatch', 'Claims', 'CityFloor', 'Returns']);
+const VALID_STATUSES   = new Set(['New', 'In progress', 'Awaiting City', 'Resolved', 'Claim raised', 'Returned']);
+const VALID_PRIORITIES = new Set(['Low', 'Medium', 'High', 'Critical']);
+
+function validateInvestigation(body, { requireBase = true } = {}) {
+    const errors = [];
+    if (requireBase) {
+        if (!body.lpn || !String(body.lpn).trim())
+            errors.push('LPN is required');
+        if (!body.team || !VALID_TEAMS.has(body.team))
+            errors.push(`Team must be one of: ${[...VALID_TEAMS].join(', ')}`);
+    }
+    if (body.lpn   != null && String(body.lpn).length   > 255)
+        errors.push('LPN must be 255 characters or fewer');
+    if (body.team  != null && !VALID_TEAMS.has(body.team))
+        errors.push(`Team must be one of: ${[...VALID_TEAMS].join(', ')}`);
+    if (body.status   != null && !VALID_STATUSES.has(body.status))
+        errors.push(`Status must be one of: ${[...VALID_STATUSES].join(', ')}`);
+    if (body.priority != null && !VALID_PRIORITIES.has(body.priority))
+        errors.push(`Priority must be one of: ${[...VALID_PRIORITIES].join(', ')}`);
+    if (body.finding != null && String(body.finding).length > 1000)
+        errors.push('Finding must be 1000 characters or fewer');
+    if (body.wms  != null && String(body.wms).length  > 500)
+        errors.push('WMS must be 500 characters or fewer');
+    if (body.city != null && String(body.city).length > 500)
+        errors.push('City acknowledgement must be 500 characters or fewer');
+    if (body.owner != null && String(body.owner).length > 255)
+        errors.push('Owner must be 255 characters or fewer');
+    return errors;
+}
+
+// Returns a positive integer ID or null for invalid params
+function parseId(param) {
+    const n = parseInt(param, 10);
+    return Number.isNaN(n) || n <= 0 ? null : n;
+}
+
+// Escape a value for safe CSV inclusion
+function escapeCSV(val) {
+    if (val == null) return '';
+    const str = String(val);
+    if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r'))
+        return `"${str.replace(/"/g, '""')}"`;
+    return str;
+}
+
 // ============= SCHEMA INITIALIZATION =============
 const initializeDatabase = async () => {
     const client = await pool.connect();
@@ -39,6 +86,7 @@ const initializeDatabase = async () => {
                 lpn         VARCHAR(255) NOT NULL,
                 team        VARCHAR(100) NOT NULL,
                 status      VARCHAR(100) NOT NULL DEFAULT 'New',
+                priority    VARCHAR(20)  NOT NULL DEFAULT 'Medium',
                 finding     TEXT,
                 wms         TEXT,
                 city        TEXT,
@@ -47,6 +95,12 @@ const initializeDatabase = async () => {
                 created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
             )
+        `);
+
+        // Migrate: add priority column to existing deployments
+        await client.query(`
+            ALTER TABLE investigations
+            ADD COLUMN IF NOT EXISTS priority VARCHAR(20) NOT NULL DEFAULT 'Medium'
         `);
 
         await client.query(`
@@ -82,6 +136,14 @@ const initializeDatabase = async () => {
             `);
             console.log('✅ Users seeded');
         }
+
+        // Performance indexes (safe to re-run)
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_inv_team       ON investigations(team)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_inv_status     ON investigations(status)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_inv_priority   ON investigations(priority)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_inv_lpn        ON investigations(lpn)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_inv_created_at ON investigations(created_at DESC)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_inv_updated_at ON investigations(updated_at DESC)`);
 
         console.log('✅ Database schema ready');
     } finally {
@@ -122,6 +184,7 @@ const rowToInvestigation = (row) => ({
     lpn:        row.lpn,
     team:       row.team,
     status:     row.status,
+    priority:   row.priority   || 'Medium',
     finding:    row.finding,
     wms:        row.wms,
     city:       row.city,
@@ -169,7 +232,9 @@ app.get('/api/investigations', async (req, res) => {
 // Get single investigation by ID
 app.get('/api/investigations/:id', async (req, res) => {
     try {
-        const id = parseInt(req.params.id, 10);
+        const id = parseId(req.params.id);
+        if (!id) return res.status(400).json({ error: 'Invalid investigation ID' });
+
         const { rows } = await pool.query(
             'SELECT * FROM investigations WHERE id = $1',
             [id]
@@ -186,14 +251,26 @@ app.get('/api/investigations/:id', async (req, res) => {
 // Create new investigation
 app.post('/api/investigations', async (req, res) => {
     try {
-        const { lpn, team, status = 'New', finding, wms, city, owner } = req.body;
+        const errors = validateInvestigation(req.body, { requireBase: true });
+        if (errors.length) return res.status(400).json({ errors });
+
+        const {
+            lpn,
+            team,
+            status   = 'New',
+            priority = 'Medium',
+            finding,
+            wms,
+            city,
+            owner
+        } = req.body;
         const timestamp = getTimestamp();
 
         const { rows } = await pool.query(
-            `INSERT INTO investigations (lpn, team, status, finding, wms, city, owner, timestamp)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            `INSERT INTO investigations (lpn, team, status, priority, finding, wms, city, owner, timestamp)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
              RETURNING *`,
-            [lpn, team, status, finding, wms, city, owner || team, timestamp]
+            [lpn, team, status, priority, finding, wms, city, owner || team, timestamp]
         );
 
         const inv = rows[0];
@@ -215,9 +292,14 @@ app.post('/api/investigations', async (req, res) => {
 app.put('/api/investigations/:id', async (req, res) => {
     const client = await pool.connect();
     try {
+        const id = parseId(req.params.id);
+        if (!id) return res.status(400).json({ error: 'Invalid investigation ID' });
+
+        const errors = validateInvestigation(req.body, { requireBase: false });
+        if (errors.length) return res.status(400).json({ errors });
+
         await client.query('BEGIN');
 
-        const id = parseInt(req.params.id, 10);
         const { rows: existing } = await client.query(
             'SELECT * FROM investigations WHERE id = $1',
             [id]
@@ -236,28 +318,30 @@ app.put('/api/investigations/:id', async (req, res) => {
              SET lpn       = COALESCE($1, lpn),
                  team      = COALESCE($2, team),
                  status    = COALESCE($3, status),
-                 finding   = COALESCE($4, finding),
-                 wms       = COALESCE($5, wms),
-                 city      = COALESCE($6, city),
-                 owner     = COALESCE($7, owner),
-                 timestamp = $8,
+                 priority  = COALESCE($4, priority),
+                 finding   = COALESCE($5, finding),
+                 wms       = COALESCE($6, wms),
+                 city      = COALESCE($7, city),
+                 owner     = COALESCE($8, owner),
+                 timestamp = $9,
                  updated_at = NOW()
-             WHERE id = $9
+             WHERE id = $10
              RETURNING *`,
             [
-                req.body.lpn    ?? null,
-                req.body.team   ?? null,
+                req.body.lpn      ?? null,
+                req.body.team     ?? null,
                 req.body.status   ?? null,
+                req.body.priority ?? null,
                 req.body.finding  ?? null,
-                req.body.wms    ?? null,
-                req.body.city   ?? null,
-                req.body.owner  ?? null,
+                req.body.wms      ?? null,
+                req.body.city     ?? null,
+                req.body.owner    ?? null,
                 timestamp,
                 id
             ]
         );
 
-        if (req.body.action || req.body.finding || req.body.wms || req.body.city || req.body.owner) {
+        if (req.body.action || req.body.finding || req.body.wms || req.body.city || req.body.owner || req.body.status || req.body.priority) {
             await client.query(
                 `INSERT INTO investigation_history (investigation_id, action, finding, user_name)
                  VALUES ($1, $2, $3, $4)`,
@@ -284,7 +368,9 @@ app.put('/api/investigations/:id', async (req, res) => {
 // Delete investigation
 app.delete('/api/investigations/:id', async (req, res) => {
     try {
-        const id = parseInt(req.params.id, 10);
+        const id = parseId(req.params.id);
+        if (!id) return res.status(400).json({ error: 'Invalid investigation ID' });
+
         const { rowCount } = await pool.query(
             'DELETE FROM investigations WHERE id = $1',
             [id]
@@ -308,18 +394,29 @@ app.post('/api/investigations/bulk', async (req, res) => {
         await client.query('BEGIN');
 
         const items = Array.isArray(req.body) ? req.body : [];
+        if (items.length === 0) {
+            return res.status(400).json({ error: 'Request body must be a non-empty array' });
+        }
+
         const timestamp = getTimestamp();
         const created = [];
 
         for (const item of items) {
+            const errors = validateInvestigation(item, { requireBase: true });
+            if (errors.length) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ error: `Row validation failed: ${errors.join('; ')}`, item });
+            }
+
             const { rows } = await client.query(
-                `INSERT INTO investigations (lpn, team, status, finding, wms, city, owner, timestamp)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                `INSERT INTO investigations (lpn, team, status, priority, finding, wms, city, owner, timestamp)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                  RETURNING *`,
                 [
                     item.lpn,
                     item.team,
-                    item.status || 'New',
+                    item.status   || 'New',
+                    item.priority || 'Medium',
                     item.finding,
                     item.wms,
                     item.city,
@@ -410,7 +507,8 @@ app.get('/api/stats', async (req, res) => {
 // Get history for an investigation
 app.get('/api/investigations/:id/history', async (req, res) => {
     try {
-        const id = parseInt(req.params.id, 10);
+        const id = parseId(req.params.id);
+        if (!id) return res.status(400).json({ error: 'Invalid investigation ID' });
 
         const { rowCount } = await pool.query(
             'SELECT 1 FROM investigations WHERE id = $1',
@@ -482,6 +580,62 @@ app.get('/api/search', async (req, res) => {
         res.json(rows.map(rowToInvestigation));
     } catch (error) {
         console.error('Error in GET /search:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// CSV export (respects same filters as search)
+app.get('/api/export', async (req, res) => {
+    try {
+        const { q, team, status, priority } = req.query;
+
+        let query = 'SELECT * FROM investigations WHERE TRUE';
+        const params = [];
+
+        if (q) {
+            params.push(`%${q}%`);
+            const idx = params.length;
+            query += ` AND (
+                lpn     ILIKE $${idx} OR
+                finding ILIKE $${idx} OR
+                owner   ILIKE $${idx} OR
+                wms     ILIKE $${idx} OR
+                city    ILIKE $${idx}
+            )`;
+        }
+        if (team) {
+            params.push(team);
+            query += ` AND team = $${params.length}`;
+        }
+        if (status) {
+            params.push(status);
+            query += ` AND status = $${params.length}`;
+        }
+        if (priority) {
+            params.push(priority);
+            query += ` AND priority = $${params.length}`;
+        }
+
+        query += ' ORDER BY id';
+
+        const { rows } = await pool.query(query, params);
+
+        const CSV_HEADERS = ['ID', 'LPN', 'Team', 'Priority', 'Status', 'Finding', 'WMS', 'City Ack', 'Owner', 'Timestamp', 'Created At', 'Updated At'];
+        const csvRows = [
+            CSV_HEADERS.join(','),
+            ...rows.map(r => [
+                r.id, r.lpn, r.team, r.priority, r.status,
+                r.finding, r.wms, r.city, r.owner,
+                r.timestamp, r.created_at, r.updated_at
+            ].map(escapeCSV).join(','))
+        ];
+
+        const filename = `investigations-${new Date().toISOString().split('T')[0]}.csv`;
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(csvRows.join('\r\n'));
+    } catch (error) {
+        console.error('Error in GET /export:', error);
         res.status(500).json({ error: error.message });
     }
 });
