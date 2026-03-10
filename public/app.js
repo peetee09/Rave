@@ -1,6 +1,17 @@
 // API Base URL - auto-detects Railway URL
 const API_BASE = window.location.origin + '/api';
 
+// ─── HTML escaping (XSS prevention) ───────────────────────
+function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 // Global state
 let currentInvestigations = [];
 let currentFilters = {
@@ -127,6 +138,7 @@ function setupEventListeners() {
     document.getElementById('manualEntryForm').addEventListener('submit', handleManualSubmit);
     document.getElementById('uploadBtn').addEventListener('click', handleFileUpload);
     document.getElementById('downloadTemplateBtn').addEventListener('click', downloadTemplate);
+    document.getElementById('exportBtn').addEventListener('click', exportToCSV);
 
     document.getElementById('searchInput').addEventListener('input', (e) => {
         currentFilters.search = e.target.value;
@@ -167,18 +179,19 @@ async function handleManualSubmit(e) {
     const lpn = document.getElementById('lpnInput').value.trim();
     if (!lpn) { showToast('LPN is required', 'error'); return; }
 
-    const team    = document.getElementById('teamSelect').value;
-    const status  = document.getElementById('statusSelect').value;
-    const finding = document.getElementById('findingInput').value.trim() || 'No initial finding';
-    const wms     = document.getElementById('wmsInput').value.trim()     || '—';
-    const city    = document.getElementById('cityInput').value.trim()    || '—';
-    const owner   = document.getElementById('ownerInput').value.trim()   || team;
+    const team     = document.getElementById('teamSelect').value;
+    const status   = document.getElementById('statusSelect').value;
+    const priority = document.getElementById('prioritySelect').value;
+    const finding  = document.getElementById('findingInput').value.trim() || 'No initial finding';
+    const wms      = document.getElementById('wmsInput').value.trim()     || '—';
+    const city     = document.getElementById('cityInput').value.trim()    || '—';
+    const owner    = document.getElementById('ownerInput').value.trim()   || team;
 
     try {
         const response = await fetch(`${API_BASE}/investigations`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ lpn, team, status, finding, wms, city, owner })
+            body: JSON.stringify({ lpn, team, status, priority, finding, wms, city, owner })
         });
 
         if (!response.ok) throw new Error('Failed to save');
@@ -213,14 +226,15 @@ async function handleFileUpload() {
             const sheet    = workbook.Sheets[workbook.SheetNames[0]];
             const rows     = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-            const headers   = rows[0] || [];
-            const lpnIdx    = headers.findIndex(h => h?.toString().toLowerCase().includes('lpn'));
-            const teamIdx   = headers.findIndex(h => h?.toString().toLowerCase().includes('team'));
-            const statusIdx = headers.findIndex(h => h?.toString().toLowerCase().includes('status'));
-            const findIdx   = headers.findIndex(h => h?.toString().toLowerCase().includes('finding'));
-            const wmsIdx    = headers.findIndex(h => h?.toString().toLowerCase().includes('wms'));
-            const cityIdx   = headers.findIndex(h => h?.toString().toLowerCase().includes('city'));
-            const ownerIdx  = headers.findIndex(h => h?.toString().toLowerCase().includes('owner'));
+            const headers    = rows[0] || [];
+            const lpnIdx     = headers.findIndex(h => h?.toString().toLowerCase().includes('lpn'));
+            const teamIdx    = headers.findIndex(h => h?.toString().toLowerCase().includes('team'));
+            const statusIdx  = headers.findIndex(h => h?.toString().toLowerCase().includes('status'));
+            const priorityIdx= headers.findIndex(h => h?.toString().toLowerCase().includes('priority'));
+            const findIdx    = headers.findIndex(h => h?.toString().toLowerCase().includes('finding'));
+            const wmsIdx     = headers.findIndex(h => h?.toString().toLowerCase().includes('wms'));
+            const cityIdx    = headers.findIndex(h => h?.toString().toLowerCase().includes('city'));
+            const ownerIdx   = headers.findIndex(h => h?.toString().toLowerCase().includes('owner'));
 
             if (lpnIdx === -1 || teamIdx === -1) {
                 showToast('File must contain LPN and Team columns', 'error');
@@ -232,13 +246,14 @@ async function handleFileUpload() {
                 const row = rows[i];
                 if (!row || !row[lpnIdx]) continue;
                 investigations.push({
-                    lpn:     String(row[lpnIdx]  || '').trim(),
-                    team:    String(row[teamIdx]  || '').trim(),
-                    status:  String(row[statusIdx]|| 'New').trim(),
-                    finding: String(row[findIdx]  || '').trim() || 'Bulk imported',
-                    wms:     String(row[wmsIdx]   || '—').trim(),
-                    city:    String(row[cityIdx]  || '—').trim(),
-                    owner:   String(row[ownerIdx] || row[teamIdx] || '').trim()
+                    lpn:      String(row[lpnIdx]      || '').trim(),
+                    team:     String(row[teamIdx]      || '').trim(),
+                    priority: String(priorityIdx >= 0 ? row[priorityIdx] || 'Medium' : 'Medium').trim(),
+                    status:   String(row[statusIdx]   || 'New').trim(),
+                    finding:  String(row[findIdx]     || '').trim() || 'Bulk imported',
+                    wms:      String(row[wmsIdx]      || '—').trim(),
+                    city:     String(row[cityIdx]     || '—').trim(),
+                    owner:    String(row[ownerIdx]    || row[teamIdx] || '').trim()
                 });
             }
 
@@ -270,8 +285,8 @@ async function handleFileUpload() {
 
 // ─── Download template ──────────────────────────────────────
 function downloadTemplate() {
-    const headers   = ['LPN', 'Team', 'Status', 'Finding', 'WMS', 'City', 'Owner'];
-    const sampleRow = ['LPN-1234', 'HRP', 'New', 'Sample finding', 'chute 12', 'pending', 'HRP'];
+    const headers   = ['LPN', 'Team', 'Priority', 'Status', 'Finding', 'WMS', 'City', 'Owner'];
+    const sampleRow = ['LPN-1234', 'HRP', 'Medium', 'New', 'Sample finding', 'chute 12', 'pending', 'HRP'];
     const csvContent = [headers.join(','), sampleRow.join(',')].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url  = window.URL.createObjectURL(blob);
@@ -339,12 +354,13 @@ function renderTable(investigations) {
     const tbody = document.getElementById('tableBody');
 
     if (investigations.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="11" class="loading-row">No investigations found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="12" class="loading-row">No investigations found</td></tr>';
         return;
     }
 
     tbody.innerHTML = investigations.map(inv => {
-        const statusClass   = inv.status.toLowerCase().replace(/\s+/g, '');
+        const statusClass   = escapeHtml(inv.status.toLowerCase().replace(/\s+/g, ''));
+        const priorityClass = escapeHtml((inv.priority || 'Medium').toLowerCase());
         const ageHours      = getAgeHours(inv);
         const ageFormatted  = formatAge(ageHours);
         const ageCls        = ageBadgeClass(inv.status, ageHours);
@@ -357,25 +373,30 @@ function renderTable(investigations) {
                        : isWarning  ? 'row-warning'
                        : '';
 
-        const findingText = (inv.finding || '').substring(0, MAX_FINDING_DISPLAY_LENGTH)
-            + ((inv.finding || '').length > MAX_FINDING_DISPLAY_LENGTH ? '…' : '');
+        const findingRaw     = inv.finding || '';
+        const findingFull    = escapeHtml(findingRaw);
+        const findingDisplay = findingRaw.length > MAX_FINDING_DISPLAY_LENGTH
+            ? escapeHtml(findingRaw.substring(0, MAX_FINDING_DISPLAY_LENGTH)) + '…'
+            : findingFull;
 
         return `
             <tr class="${rowClass}" data-id="${inv.id}">
                 <td>${inv.id}</td>
-                <td class="lpn-cell"><strong>${inv.lpn}</strong></td>
-                <td><span class="team-badge">${inv.team}</span></td>
-                <td><span class="status-badge status-${statusClass}">${inv.status}</span></td>
-                <td title="${(inv.finding || '').replace(/"/g, '&quot;')}">${findingText}</td>
-                <td>${inv.wms || '—'}</td>
-                <td>${inv.city || '—'}</td>
-                <td>${inv.owner || '—'}</td>
+                <td class="lpn-cell"><strong>${escapeHtml(inv.lpn)}</strong></td>
+                <td><span class="team-badge">${escapeHtml(inv.team)}</span></td>
+                <td><span class="status-badge status-${statusClass}">${escapeHtml(inv.status)}</span></td>
+                <td><span class="priority-badge priority-${priorityClass}">${escapeHtml(inv.priority || 'Medium')}</span></td>
+                <td title="${findingFull}">${findingDisplay}</td>
+                <td>${escapeHtml(inv.wms) || '—'}</td>
+                <td>${escapeHtml(inv.city) || '—'}</td>
+                <td>${escapeHtml(inv.owner) || '—'}</td>
                 <td><span class="age-badge ${ageCls}">${ageFormatted}</span></td>
-                <td>${inv.timestamp || '—'}</td>
+                <td>${escapeHtml(inv.timestamp) || '—'}</td>
                 <td>
                     <div class="action-buttons">
                         <button class="action-btn" onclick="showHistory(${inv.id})">📋 History</button>
                         <button class="action-btn" onclick="showUpdateForm(${inv.id})">✏️ Update</button>
+                        <button class="action-btn danger" onclick="deleteInvestigation(${inv.id})">🗑 Delete</button>
                     </div>
                     <div id="update-form-${inv.id}" style="display:none;" class="update-form">
                         <div class="update-form-grid">
@@ -400,15 +421,24 @@ function renderTable(investigations) {
                                        placeholder="Assign owner">
                             </div>
                         </div>
-                        <select id="status-${inv.id}" class="update-select">
-                            <option value="">Keep status</option>
-                            <option value="New">New</option>
-                            <option value="In progress">In progress</option>
-                            <option value="Awaiting City">Awaiting City</option>
-                            <option value="Resolved">Resolved</option>
-                            <option value="Claim raised">Claim raised</option>
-                            <option value="Returned">Returned</option>
-                        </select>
+                        <div class="update-form-selects">
+                            <select id="status-${inv.id}" class="update-select">
+                                <option value="">Keep status</option>
+                                <option value="New">New</option>
+                                <option value="In progress">In progress</option>
+                                <option value="Awaiting City">Awaiting City</option>
+                                <option value="Resolved">Resolved</option>
+                                <option value="Claim raised">Claim raised</option>
+                                <option value="Returned">Returned</option>
+                            </select>
+                            <select id="priority-${inv.id}" class="update-select">
+                                <option value="">Keep priority</option>
+                                <option value="Low">Low</option>
+                                <option value="Medium">Medium</option>
+                                <option value="High">High</option>
+                                <option value="Critical">Critical</option>
+                            </select>
+                        </div>
                         <button class="update-submit" onclick="updateInvestigation(${inv.id})">
                             ✔ Submit Update
                         </button>
@@ -433,10 +463,10 @@ async function showHistory(id) {
         } else {
             historyContent.innerHTML = history.map(h => `
                 <div class="history-item">
-                    <div class="history-action">${h.action}</div>
-                    ${h.finding ? `<div class="history-finding">${h.finding}</div>` : ''}
+                    <div class="history-action">${escapeHtml(h.action)}</div>
+                    ${h.finding ? `<div class="history-finding">${escapeHtml(h.finding)}</div>` : ''}
                     <div class="history-meta">
-                        by ${h.user || 'System'} &middot; ${new Date(h.timestamp).toLocaleString()}
+                        by ${escapeHtml(h.user || 'System')} &middot; ${new Date(h.timestamp).toLocaleString()}
                     </div>
                 </div>
             `).join('');
@@ -458,13 +488,14 @@ function showUpdateForm(id) {
 
 // ─── Submit update ───────────────────────────────────────────
 async function updateInvestigation(id) {
-    const finding = document.getElementById(`finding-${id}`).value.trim();
-    const wms     = document.getElementById(`wms-${id}`).value.trim();
-    const city    = document.getElementById(`city-${id}`).value.trim();
-    const owner   = document.getElementById(`owner-${id}`).value.trim();
-    const status  = document.getElementById(`status-${id}`).value;
+    const finding  = document.getElementById(`finding-${id}`).value.trim();
+    const wms      = document.getElementById(`wms-${id}`).value.trim();
+    const city     = document.getElementById(`city-${id}`).value.trim();
+    const owner    = document.getElementById(`owner-${id}`).value.trim();
+    const status   = document.getElementById(`status-${id}`).value;
+    const priority = document.getElementById(`priority-${id}`)?.value || '';
 
-    if (!finding && !wms && !city && !owner && !status) {
+    if (!finding && !wms && !city && !owner && !status && !priority) {
         showToast('Enter at least one field to update', 'error');
         return;
     }
@@ -474,11 +505,12 @@ async function updateInvestigation(id) {
         user: 'Current User'
     };
 
-    if (finding) updateData.finding = finding;
-    if (wms)     updateData.wms     = wms;
-    if (city)    updateData.city    = city;
-    if (owner)   updateData.owner   = owner;
-    if (status)  updateData.status  = status;
+    if (finding)  updateData.finding  = finding;
+    if (wms)      updateData.wms      = wms;
+    if (city)     updateData.city     = city;
+    if (owner)    updateData.owner    = owner;
+    if (status)   updateData.status   = status;
+    if (priority) updateData.priority = priority;
 
     try {
         const response = await fetch(`${API_BASE}/investigations/${id}`, {
@@ -495,7 +527,10 @@ async function updateInvestigation(id) {
             const el = document.getElementById(`${f}-${id}`);
             if (el) el.value = '';
         });
-        document.getElementById(`status-${id}`).value = '';
+        const statusEl   = document.getElementById(`status-${id}`);
+        const priorityEl = document.getElementById(`priority-${id}`);
+        if (statusEl)   statusEl.value   = '';
+        if (priorityEl) priorityEl.value = '';
 
         await loadInvestigations(true);
         await loadStats(true);
@@ -508,6 +543,42 @@ async function updateInvestigation(id) {
 }
 
 // ─── Expose to global scope for onclick handlers ─────────────
-window.showHistory        = showHistory;
-window.showUpdateForm     = showUpdateForm;
+window.showHistory         = showHistory;
+window.showUpdateForm      = showUpdateForm;
 window.updateInvestigation = updateInvestigation;
+window.deleteInvestigation = deleteInvestigation;
+
+// ─── Delete investigation ────────────────────────────────────
+async function deleteInvestigation(id) {
+    const inv = currentInvestigations.find(i => i.id === id);
+    const label = inv ? `"${inv.lpn}"` : `#${id}`;
+    if (!confirm(`Delete investigation ${label} (ID: ${id})?\n\nThis action cannot be undone and all history will be removed.`)) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/investigations/${id}`, { method: 'DELETE' });
+        if (!response.ok) throw new Error('Delete failed');
+        await loadInvestigations(true);
+        await loadStats(true);
+        showToast(`Investigation ${label} deleted`);
+    } catch (error) {
+        console.error('Delete error:', error);
+        showToast('Failed to delete investigation', 'error');
+    }
+}
+
+// ─── Export to CSV ───────────────────────────────────────────
+function exportToCSV() {
+    const params = new URLSearchParams();
+    if (currentFilters.search)   params.set('q',        currentFilters.search);
+    if (currentFilters.team)     params.set('team',     currentFilters.team);
+    if (currentFilters.status)   params.set('status',   currentFilters.status);
+    if (currentFilters.priority) params.set('priority', currentFilters.priority);
+    const url = `${API_BASE}/export${params.toString() ? '?' + params.toString() : ''}`;
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    showToast('Export started', 'success');
+}

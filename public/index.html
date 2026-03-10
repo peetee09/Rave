@@ -102,6 +102,15 @@
                             </select>
                         </div>
                         <div class="form-group">
+                            <label>Priority</label>
+                            <select id="prioritySelect">
+                                <option value="Low">Low</option>
+                                <option value="Medium" selected>Medium</option>
+                                <option value="High">High</option>
+                                <option value="Critical">Critical</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
                             <label>Status</label>
                             <select id="statusSelect">
                                 <option value="New">New</option>
@@ -181,7 +190,10 @@
             <section class="table-section">
                 <div class="table-header">
                     <h3>📋 Active Investigations</h3>
-                    <span class="record-count" id="recordCount">0 records</span>
+                    <div class="table-header-actions">
+                        <span class="record-count" id="recordCount">0 records</span>
+                        <button class="btn-outline" id="exportBtn">⬇ Export CSV</button>
+                    </div>
                 </div>
                 <div class="table-container">
                     <table id="investigationsTable">
@@ -191,6 +203,7 @@
                                 <th>LPN</th>
                                 <th>Team</th>
                                 <th>Status</th>
+                                <th>Priority</th>
                                 <th>Finding</th>
                                 <th>WMS</th>
                                 <th>City</th>
@@ -202,7 +215,7 @@
                         </thead>
                         <tbody id="tableBody">
                             <tr>
-                                <td colspan="11" class="loading-row">Loading data from server...</td>
+                                <td colspan="12" class="loading-row">Loading data from server...</td>
                             </tr>
                         </tbody>
                     </table>

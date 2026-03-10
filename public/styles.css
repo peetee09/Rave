@@ -495,6 +495,12 @@ body {
     margin-bottom: 0.75rem;
 }
 
+.table-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
 .table-header h3 {
     color: var(--text-bright);
     font-weight: 600;
@@ -523,7 +529,7 @@ table {
     width: 100%;
     border-collapse: collapse;
     font-size: 0.8rem;
-    min-width: 1520px;
+    min-width: 1640px;
 }
 
 thead { position: sticky; top: 0; z-index: 10; }
@@ -646,6 +652,25 @@ tr.row-warning:hover td  { background: rgba(245,165,35,0.13); }
 .status-Claimraised  { background: rgba(232,72,104,.13);  color: #e84868; border-color: rgba(232,72,104,.3); }
 .status-Returned     { background: rgba(200,149,110,.13); color: #c8956e; border-color: rgba(200,149,110,.3); }
 
+/* ─── Priority badge ────────────────────────────────────── */
+.priority-badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    font-size: 0.65rem;
+    font-weight: 700;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.priority-low      { background: var(--surface-raised);        color: var(--text-muted); border-color: var(--border); }
+.priority-medium   { background: rgba(74,157,250,.13);          color: #4a9dfa;           border-color: rgba(74,157,250,.3); }
+.priority-high     { background: rgba(245,165,35,.13);          color: #f5a523;           border-color: rgba(245,165,35,.3); }
+.priority-critical { background: rgba(232,72,104,.13);          color: #e84868;           border-color: rgba(232,72,104,.3);
+                     animation: overdue-glow 2.5s ease-in-out infinite; }
+
 /* ─── Action buttons ────────────────────────────────────── */
 .action-buttons {
     display: flex;
@@ -669,6 +694,12 @@ tr.row-warning:hover td  { background: rgba(245,165,35,0.13); }
     background: var(--primary);
     color: #fff;
     border-color: var(--primary);
+}
+
+.action-btn.danger:hover {
+    background: var(--danger);
+    color: #fff;
+    border-color: var(--danger);
 }
 
 /* ─── Inline update form ────────────────────────────────── */
@@ -731,6 +762,12 @@ tr.row-warning:hover td  { background: rgba(245,165,35,0.13); }
     color: var(--text);
     border-radius: 3px;
     width: 100%;
+}
+
+.update-form-selects {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.4rem;
 }
 
 .update-select option { background: var(--surface-raised); color: var(--text); }
