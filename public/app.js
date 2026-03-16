@@ -27,6 +27,19 @@ const WARNING_HOURS  = 24;
 const MS_PER_HOUR    = 3_600_000;
 const MAX_FINDING_DISPLAY_LENGTH = 55;
 
+// Valid enum values for bulk upload normalisation (must mirror server.js)
+const BULK_TEAMS      = ['HRP', 'Dispatch', 'Claims', 'CityFloor', 'Returns'];
+const BULK_STATUSES   = ['New', 'In progress', 'Awaiting City', 'Resolved', 'Claim raised', 'Returned'];
+const BULK_PRIORITIES = ['Low', 'Medium', 'High', 'Critical'];
+
+// Case-insensitive match against a list of valid values; returns the canonical
+// form when found, or the original value when not (so the server can report it).
+function normalizeEnumField(value, validValues) {
+    if (!value) return value;
+    const lower = value.toLowerCase();
+    return validValues.find(v => v.toLowerCase() === lower) || value;
+}
+
 // Initialize on load
 document.addEventListener('DOMContentLoaded', () => {
     checkConnection();
@@ -247,9 +260,9 @@ async function handleFileUpload() {
                 if (!row || !row[lpnIdx]) continue;
                 investigations.push({
                     lpn:      String(row[lpnIdx]      || '').trim(),
-                    team:     String(row[teamIdx]      || '').trim(),
-                    priority: String(priorityIdx >= 0 ? row[priorityIdx] || 'Medium' : 'Medium').trim(),
-                    status:   String(row[statusIdx]   || 'New').trim(),
+                    team:     normalizeEnumField(String(row[teamIdx]      || '').trim(), BULK_TEAMS),
+                    priority: normalizeEnumField(String(priorityIdx >= 0 ? row[priorityIdx] || 'Medium' : 'Medium').trim(), BULK_PRIORITIES),
+                    status:   normalizeEnumField(String(row[statusIdx]   || 'New').trim(), BULK_STATUSES),
                     finding:  String(row[findIdx]     || '').trim() || 'Bulk imported',
                     wms:      String(row[wmsIdx]      || '—').trim(),
                     city:     String(row[cityIdx]     || '—').trim(),
@@ -268,7 +281,12 @@ async function handleFileUpload() {
                 body: JSON.stringify(investigations)
             });
 
-            if (!response.ok) throw new Error('Upload failed');
+            if (!response.ok) {
+                let errMsg = 'Upload failed';
+                // Best-effort parse; fall back to generic message if body is not JSON.
+                try { const d = await response.json(); if (d.error) errMsg = d.error; } catch (_) {}
+                throw new Error(errMsg);
+            }
 
             fileInput.value = '';
             await loadInvestigations();
@@ -277,7 +295,7 @@ async function handleFileUpload() {
 
         } catch (error) {
             console.error('Upload error:', error);
-            showToast('Failed to upload file', 'error');
+            showToast(error.message || 'Failed to upload file', 'error');
         }
     };
     reader.readAsArrayBuffer(file);
