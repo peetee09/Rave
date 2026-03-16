@@ -401,11 +401,12 @@ app.post('/api/investigations/bulk', async (req, res) => {
         const timestamp = getTimestamp();
         const created = [];
 
-        for (const item of items) {
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
             const errors = validateInvestigation(item, { requireBase: true });
             if (errors.length) {
                 await client.query('ROLLBACK');
-                return res.status(400).json({ error: `Row validation failed: ${errors.join('; ')}`, item });
+                return res.status(400).json({ error: `Row ${i + 1} validation failed: ${errors.join('; ')}`, item });
             }
 
             const { rows } = await client.query(
